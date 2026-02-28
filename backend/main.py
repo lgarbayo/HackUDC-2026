@@ -13,6 +13,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from api.routes import router
 from services.vector_db import VectorDBService
@@ -53,6 +54,11 @@ async def health_check():
 
 # ── Frontend estático ──────────────────────────────────────────
 FRONTEND_PATH = "/app/frontend/index.html"
+FRONTEND_ASSETS_PATH = "/app/frontend/assets"
+
+# Serve static assets (SVG, CSS, JS, images, etc.)
+if os.path.isdir(FRONTEND_ASSETS_PATH):
+    app.mount("/assets", StaticFiles(directory=FRONTEND_ASSETS_PATH), name="assets")
 
 @app.get("/", tags=["Frontend"])
 async def serve_frontend():

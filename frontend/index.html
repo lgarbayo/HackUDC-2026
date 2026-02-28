@@ -8,6 +8,7 @@
   <meta name="format-detection" content="telephone=no" />
   <title>Meiga Search</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="icon" type="image/x-icon" href="assets/meiga-logo.svg">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <style>
@@ -1393,12 +1394,15 @@
 
       <!-- App title -->
       <div id="appTitle" class="flex flex-col items-center mb-4 gap-0.5">
+        <div class="flex items-center gap-2">
+          <img src="assets/meiga-logo.svg" alt="Meiga Logo" style="width: 48px; height: 48px;" />
+          <span
+            style="font-family:'Inter','Roboto',sans-serif;font-size:3rem;font-weight:700;color:#14213d;letter-spacing:-0.03em;line-height:1">meiga</span>
+        </div>
         <span
-          style="font-family:'Inter','Roboto',sans-serif;font-size:3rem;font-weight:700;color:#14213d;letter-spacing:-0.03em;line-height:1">meiga</span>
-        <span
-          style="font-family:'Times New Roman',Georgia,serif;font-style:italic;font-size:1rem;color:#fca311;letter-spacing:0.2em;font-weight:400">search</span>
+          style="font-family:'Times New Roman',Georgia,serif;font-style:italic;font-size:1rem;color:#fca311;letter-spacing:0.2em;font-weight:400;margin-top:-8px;">search</span>
       </div>
-
+      
       <!-- Search bar -->
       <div class="search-bar-wrapper w-full">
         <input id="searchInput" type="text" placeholder="What document or functionality do you need?" autocomplete="off"
