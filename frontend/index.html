@@ -1069,33 +1069,39 @@
     .dd-backdrop {
       position: fixed;
       inset: 0;
-      background: rgba(20, 33, 61, .5);
-      backdrop-filter: blur(4px);
+      background: rgba(20, 33, 61, .6);
+      backdrop-filter: blur(8px);
       display: flex;
-      justify-content: flex-end;
+      justify-content: center;
+      align-items: center;
       z-index: 9997;
       animation: fadeIn .15s ease;
+      padding: 20px;
     }
 
-    .dd-panel {
-      width: 100%;
-      max-width: 600px;
-      height: 100%;
-      background: #fff;
+    .dd-modal {
+      width: 90vw;
+      max-width: 1100px;
+      height: 90vh;
+      background: rgba(255, 255, 255, 0.95);
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      animation: ddSlideIn .25s ease;
-      box-shadow: -8px 0 40px rgba(20, 33, 61, .18);
+      border-radius: 16px;
+      animation: ddZoomIn .25s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.5);
     }
 
-    @keyframes ddSlideIn {
+    @keyframes ddZoomIn {
       from {
-        transform: translateX(100%)
+        opacity: 0;
+        transform: scale(0.95) translateY(10px);
       }
 
       to {
-        transform: translateX(0)
+        opacity: 1;
+        transform: scale(1) translateY(0);
       }
     }
 
@@ -1503,7 +1509,8 @@
           </svg>
           <p id="emptyText" style="margin:0;font-size:.88rem;text-align:center"></p>
         </div>
-        <p id="resultsMeta" style="display:none;font-size:.78rem;color:rgba(20,33,61,.55);margin:0;padding-bottom: 12px;"></p>
+        <p id="resultsMeta"
+          style="display:none;font-size:.78rem;color:rgba(20,33,61,.55);margin:0;padding-bottom: 12px;"></p>
         <div id="resultsList" class="flex flex-col gap-3" style="display:none"></div>
         <div id="paginationContainer" style="display:none; justify-content:center; padding: 10px 0;">
           <button id="loadMoreBtn" class="filter-btn" onclick="loadMoreResults()">
@@ -1559,7 +1566,7 @@
 
     <!-- DOCUMENT DETAIL PANEL -->
     <div class="dd-backdrop" id="ddModal" style="display:none" onclick="if(event.target===this)closeDocDetail()">
-      <div class="dd-panel">
+      <div class="dd-modal">
         <div class="dd-header">
           <h2 id="ddTitle">Documento</h2>
           <button class="dd-close" onclick="closeDocDetail()" aria-label="Cerrar">
@@ -1574,6 +1581,9 @@
           <div class="fe-empty">
             <div class="spinner" style="width:24px;height:24px;margin:0 auto"></div>
           </div>
+        </div>
+        <div id="ddExif"
+          style="padding: 20px 28px; border-top: 1px solid rgba(20,33,61,0.08); background: #f9fafb; display: none; overflow-y: auto; max-height: 250px;">
         </div>
         <div class="dd-source">
           <span class="dd-source-path" id="ddSource"></span>
@@ -1977,6 +1987,8 @@
         $('ddModal').style.display = 'flex';
         $('ddTitle').textContent = 'Cargando…';
         $('ddMeta').innerHTML = '';
+        $('ddExif').style.display = 'none';
+        $('ddExif').innerHTML = '';
         $('ddBody').innerHTML = '<div class="fe-empty"><div class="spinner" style="width:24px;height:24px;margin:0 auto"></div></div>';
         $('ddSource').textContent = source;
 
@@ -2012,15 +2024,32 @@
           const isPdf = /\.pdf$/i.test(ext);
 
           if (isImg) {
-            $('ddBody').innerHTML = `<div style="text-align:center;padding:20px;background:#f5f5f5;height:100%;min-height:70vh;display:flex;align-items:center;justify-content:center;"><img src="${url}" style="max-width:100%;max-height:80vh;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1)"></div>`;
+            $('ddBody').innerHTML = `<div style="text-align:center;padding:20px;background:#f5f5f5;height:100%;min-height:50vh;display:flex;align-items:center;justify-content:center;"><img src="${url}" style="max-width:100%;max-height:50vh;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1)"></div>`;
             $('ddBody').style.padding = '0';
           } else if (isPdf) {
-            $('ddBody').innerHTML = `<iframe src="${url}" style="width:100%;height:100%;min-height:70vh;border:none;border-radius:8px;background:#f5f5f5;"></iframe>`;
+            $('ddBody').innerHTML = `<iframe src="${url}" style="width:100%;height:100%;min-height:50vh;border:none;border-radius:8px;background:#f5f5f5;"></iframe>`;
             $('ddBody').style.padding = '0';
           } else {
             // Fallback para CSV, TXT, XLSX (se muestran como texto extraído para evitar descargas)
-            $('ddBody').innerHTML = `<div style="white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;background:#f8f9fa;padding:24px;border-radius:8px;border:1px solid #e2e8f0;overflow-x:auto;font-size:0.9rem;line-height:1.6;color:#334155;height:100%;min-height:70vh;">${esc(doc.fullText)}</div>`;
+            $('ddBody').innerHTML = `<div style="white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;background:#f8f9fa;padding:24px;border-radius:8px;border:1px solid #e2e8f0;overflow-x:auto;font-size:0.9rem;line-height:1.6;color:#334155;height:100%;min-height:50vh;">${esc(doc.fullText)}</div>`;
             $('ddBody').style.padding = '20px';
+          }
+
+          // EXIF DATA RENDERING
+          if (doc.exif_metadata && Object.keys(doc.exif_metadata).length > 0) {
+            let exifHtml = '<h4 style="margin:0 0 12px 0;font-size:0.85rem;color:rgba(20,33,61,0.5);text-transform:uppercase;letter-spacing:0.5px;">Metadatos Técnicos (ExifTool)</h4><div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(220px, 1fr));gap:12px;">';
+            for (const [key, value] of Object.entries(doc.exif_metadata)) {
+              // Excluir metadatos redundantes o rutas internas del Docker container
+              if (['Directory', 'SourceFile', 'ExifToolVersion', 'FileName'].includes(key)) continue;
+              exifHtml += `
+                <div style="background:#fff;padding:8px 12px;border-radius:6px;border:1px solid rgba(20,33,61,0.06);box-shadow:0 2px 4px rgba(0,0,0,0.02)">
+                  <div style="font-size:0.65rem;color:var(--accent);font-weight:700;margin-bottom:2px;word-break:break-all">${esc(key)}</div>
+                  <div style="font-size:0.8rem;color:var(--text);font-family:ui-monospace,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(String(value))}">${esc(String(value))}</div>
+                </div>`;
+            }
+            exifHtml += '</div>';
+            $('ddExif').innerHTML = exifHtml;
+            $('ddExif').style.display = 'block';
           }
 
         } catch (e) {

@@ -387,9 +387,32 @@ async def get_document_detail(source: str = Query(..., description="Ruta del arc
         doc_type = type_map.get(ext_clean, ext_clean)
         first_chunk = chunks[0] if chunks else {}
 
+        # Ejecutar ExifTool para obtener metadatos reales del archivo
+        exif_data = None
+        if file_path:
+            try:
+                import subprocess
+                import json
+                import asyncio
+                # -j flag devuelve salida JSON
+                result = await asyncio.to_thread(
+                    subprocess.run,
+                    ["exiftool", "-j", str(file_path)],
+                    capture_output=True,
+                    text=True,
+                    check=False
+                )
+                
+                if result.stdout:
+                    parsed_exif = json.loads(result.stdout)
+                    if isinstance(parsed_exif, list) and len(parsed_exif) > 0:
+                        exif_data = parsed_exif[0]
+            except Exception as e:
+                logger.error(f"Error parseando metadatos ExifTool para {source}: {e}")
+
         return {
             "source": source,
-            "title": file_path.stem.replace("_", " ").title(),
+            "title": file_path.stem.replace("_", " ").title() if file_path else source,
             "extension": ext,
             "type": doc_type,
             "category": first_chunk.get("category", "General"),
@@ -403,6 +426,7 @@ async def get_document_detail(source: str = Query(..., description="Ruta del arc
             "producer": first_chunk.get("producer"),
             "chunks": [{"text": c["text"], "chunkIndex": c.get("chunk_index"), "page": c.get("page")} for c in chunks],
             "fullText": full_text,
+            "exif_metadata": exif_data
         }
     except HTTPException:
         raise
