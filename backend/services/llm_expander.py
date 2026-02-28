@@ -17,9 +17,9 @@ class QueryExpanderModel:
         import torch
         from transformers import AutoTokenizer, AutoModelForCausalLM
 
-        logger.info("🔄 Cargando DeepESP/gpt2-spanish en CPU...")
+        logger.info("🔄 Cargando HuggingFaceTB/SmolLM2-135M en CPU...")
         self.device = "cpu"
-        model_name = "DeepESP/gpt2-spanish"
+        model_name = "HuggingFaceTB/SmolLM2-135M"
 
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModelForCausalLM.from_pretrained(
@@ -42,9 +42,11 @@ class QueryExpanderModel:
         return cls._instance
 
     def expand_query_sync(self, user_query: str) -> str:
-        # Terminamos el prompt con ": " (sin salto de línea) para que GPT-2
-        # continúe en la misma línea y no empiece generando un \n vacío.
-        prompt = f"Palabras relacionadas a {user_query}: "
+        import re
+        # Few-shot prompt que guía al modelo a generar una lista separada por comas
+        prompt = (
+            f"{user_query}"
+        )
 
         inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
 
@@ -53,30 +55,33 @@ class QueryExpanderModel:
         with torch.no_grad():
             outputs = self.model.generate(
                 **inputs,
-                max_new_tokens=24,  # Más tokens para capturar varias palabras clave
-                temperature=0.5,
+                max_new_tokens=32,            # Ligeramente aumentado para permitir más etiquetas
+                temperature=0.75,             # Aumentado (antes 0.5) para mayor creatividad y diversidad
                 do_sample=True,
                 top_k=50,
-                top_p=0.9,
+                top_p=0.95,                   # Aumentado (antes 0.9) para considerar una cola más larga de vocabulario
+                repetition_penalty=1.2,       # Penaliza la repetición para evitar que genere la misma etiqueta varias veces
                 pad_token_id=self.tokenizer.eos_token_id,
             )
 
-        # Recortar solo lo nuevo generado
+        # Recortar solo lo nuevo generado (todo lo que viene después del prompt)
         input_length = inputs.input_ids.shape[1]
         generated_tokens = outputs[0][input_length:]
         response = self.tokenizer.decode(generated_tokens, skip_special_tokens=True)
 
-        # Unir todas las líneas en una sola (evita que un \n inicial vacíe el resultado)
-        clean_response = " ".join(response.split())
+        # Quedarnos solo con la primera línea (el modelo puede generar el siguiente ejemplo)
+        first_line = response.split("\n")[0]
 
-        # Truncar en el primer punto para quedarnos con la primera oración/lista
-        if "." in clean_response:
-            clean_response = clean_response[:clean_response.index(".")]
+        # Extraer tokens individuales (palabras alfanuméricas) y reconstruir como lista CSV
+        tokens = re.findall(r"[\w'\-]+", first_line)
 
-        # Eliminamos signos de puntuación extraños al final si los hay
-        clean_response = clean_response.rstrip(".,;")
+        if tokens:
+            clean_response = ", ".join(tokens)
+        else:
+            # Fallback: usar las palabras de la query original
+            clean_response = ", ".join(user_query.split())
 
-        logger.info(f"🧠 GPT-2 Autocompletado: '{user_query}' -> '{clean_response}'")
+        logger.info(f"🧠 SmolLM keywords: '{user_query}' -> '{clean_response}'")
         return clean_response
 
 

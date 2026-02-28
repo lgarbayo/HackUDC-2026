@@ -230,16 +230,41 @@ async def search_documents(
                     filters=filters if filters else None
                 )
 
-                if raw_results and keyword_results:
-                    # MERGE: combinar ambos resultados, deduplicar por texto y limitar a top_k
-                    seen_texts: set[str] = {r.get("text", "") for r in raw_results}
-                    for kr in keyword_results:
-                        if kr.get("text", "") not in seen_texts:
-                            raw_results.append(kr)
-                            seen_texts.add(kr.get("text", ""))
-                    # Reordenar por score descendente y truncar
-                    raw_results = sorted(raw_results, key=lambda r: r.get("score", 0.0), reverse=True)[:top_k]
-                    logger.info(f"🔀 Resultados combinados: {len(raw_results)} (query + keywords)")
+                # --- FIXED MERGE ---
+                # Build a unified result pool, tagging each result with the
+                # query string that produced it so highlights work correctly.
+                seen_texts: set[str] = set()
+                merged: list[dict] = []
+
+                for r in raw_results:
+                    txt = r.get("text", "")
+                    if txt not in seen_texts:
+                        r["_highlight_query"] = q_normalized   # original query
+                        merged.append(r)
+                        seen_texts.add(txt)
+
+                for r in keyword_results:
+                    txt = r.get("text", "")
+                    if txt not in seen_texts:
+                        r["_highlight_query"] = extracted_keywords  # keyword query
+                        merged.append(r)
+                        seen_texts.add(txt)
+
+                # Re-rank: results found by BOTH queries should rank highest.
+                # Give a small score boost to keyword-only results so they are
+                # not buried under low-scoring original results.
+                keyword_texts = {r.get("text", "") for r in keyword_results}
+                original_texts = {r.get("text", "") for r in raw_results}
+
+                for r in merged:
+                    txt = r.get("text", "")
+                    if txt in keyword_texts and txt in original_texts:
+                        r["score"] = r.get("score", 0.0) * 1.15  # boost overlap
+                    elif txt in keyword_texts:
+                        r["score"] = r.get("score", 0.0) * 1.05  # slight boost for keyword-only
+
+                raw_results = sorted(merged, key=lambda r: r.get("score", 0.0), reverse=True)[:top_k]
+                logger.info(f"🔀 Resultados combinados: {len(raw_results)} (query + keywords)")
                 elif keyword_results:
                     # Solo teníamos keywords results (fallback)
                     raw_results = keyword_results
