@@ -618,7 +618,7 @@
     }
 
     .fragment mark {
-      background: rgba(252, 163, 17, .25);
+      background: rgba(255, 238, 0);
       color: inherit;
       border-radius: 2px;
       padding: 0 1px;
@@ -627,7 +627,7 @@
     .tag {
       font-size: .65rem;
       padding: 2px 8px;
-      background: rgba(20, 33, 61, .07);
+      background: rgb(255, 238, 0);
       border-radius: 8px;
       color: var(--text);
     }
@@ -2290,11 +2290,16 @@
     </div>
   </div>`;
       }
-      function applyHighlights(t, hl) {
-        if (!hl || !hl.length) return t;
-        let out = '', c = 0;
-        [...hl].sort((a, b) => a.start - b.start).forEach(h => { out += t.slice(c, h.start) + `<mark>${t.slice(h.start, h.end)}</mark>`; c = h.end });
-        return out + t.slice(c);
+      function applyHighlights(t, _hl) {
+        // Highlight based on current query words (client-side), ignoring
+        // backend positions which can be offset after HTML-escaping.
+        const q = (currentQuery || '').trim();
+        if (!q) return t;
+        const words = q.split(/\s+/).filter(w => w.length >= 2);
+        if (!words.length) return t;
+        const escaped = words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+        const re = new RegExp(`(${escaped.join('|')})`, 'gi');
+        return t.replace(re, '<mark>$1</mark>');
       }
       /* ── Document Detail ──────────────────────────────────── */
       let currentDocSource = null;
