@@ -143,13 +143,29 @@ async def search_documents(
     try:
         start_time = time.time()
 
-        # Construir filtros
+        # Reverse-map: los chips del frontend envían tipos como "pdf", "contract", "invoice"
+        # pero Qdrant almacena la extensión real del archivo (.pdf, .csv, etc.)
+        type_to_extensions = {
+            "pdf": [".pdf", ".txt", ".png", ".jpg", ".jpeg"],  # Documentos generales
+            "contract": [".pdf"],   # Contratos son PDFs
+            "invoice": [".csv", ".xlsx"],  # Facturas son datos tabulares
+            "code_snippet": [".txt"],  # Código fuente
+            "proposal": [".pdf"],  # Propuestas son PDFs
+        }
+
         filters = {}
         if type:
-            filters["extension"] = type
+            # Convertir tipos del frontend a extensiones reales
+            extensions = []
+            for t in type:
+                extensions.extend(type_to_extensions.get(t, []))
+            # Deduplicar
+            extensions = list(set(extensions))
+            if extensions:
+                filters["extension"] = extensions
 
         vdb = VectorDBService()
-        raw_results = await vdb.search(query=q, top_k=top_k)
+        raw_results = await vdb.search(query=q, top_k=top_k, filters=filters if filters else None)
 
         # Transformar al formato SearchResponse del frontend
         results = []
