@@ -185,24 +185,12 @@ async def search_documents(
             source = r.get("source", "unknown")
             ext = Path(source).suffix.lower().lstrip(".")  # "pdf", "csv", etc.
 
-            # Mapear extensión a DocumentType del frontend
-            type_map = {
-                "pdf": "pdf",
-                "txt": "txt",
-                "csv": "csv",
-                "xlsx": "xlsx",
-                "png": "image",
-                "jpg": "image",
-                "jpeg": "image",
-            }
-            doc_type = type_map.get(ext, ext)
-
             # Construir DocumentMetadata
             now_iso = datetime.now(timezone.utc).isoformat()
             document = {
                 "id": str(uuid.uuid4()),
                 "title": Path(source).stem.replace("_", " ").title(),
-                "type": doc_type,
+                "type": r.get("category", "General"),
                 "source": source,
                 "author": None,
                 "createdAt": now_iso,
