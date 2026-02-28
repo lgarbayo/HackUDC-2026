@@ -25,6 +25,10 @@ from qdrant_client.models import (
     Distance,
     PointStruct,
     VectorParams,
+    Filter,
+    FieldCondition,
+    MatchValue,
+    MatchText,
 )
 
 from core.config import settings
@@ -193,13 +197,19 @@ class VectorDBService:
 
         return len(points)
 
-    def search(self, query: str, top_k: int = 5) -> list[dict]:
+    def search(
+        self, 
+        query: str, 
+        top_k: int = 5,
+        filters: dict = None,
+    ) -> list[dict]:
         """
-        Busca los chunks más similares a la query.
+        Busca los chunks más similares a la query, con filtros dinámicos.
 
         Args:
             query: Texto de búsqueda.
             top_k: Número de resultados a devolver.
+            filters: Diccionario de metadatos exactos a filtrar (ej. {"category": "RRHH"}).
 
         Returns:
             Lista de dicts con: text, score, source, y otros metadatos.
@@ -207,10 +217,37 @@ class VectorDBService:
         # Vectorizar la query
         query_embedding = self.embedder.embed([query])[0]
 
+        # Construir filtros opcionales dinámicamente
+        query_filter = None
+        
+        if filters:
+            must_conditions = []
+            
+            for key, value in filters.items():
+                if not value:
+                    continue
+                    
+                # Si es una lista (ej: múltiples tipos de archivo o categorías)
+                if isinstance(value, list):
+                    should_conditions = [
+                        FieldCondition(key=key, match=MatchValue(value=v))
+                        for v in value
+                    ]
+                    must_conditions.append(Filter(should=should_conditions))
+                # Si es un valor simple
+                else:
+                    must_conditions.append(
+                        FieldCondition(key=key, match=MatchValue(value=value))
+                    )
+                    
+            if must_conditions:
+                query_filter = Filter(must=must_conditions)
+
         # Buscar en Qdrant
         results = self.client.query_points(
             collection_name=self.collection_name,
             query=query_embedding,
+            query_filter=query_filter,
             limit=top_k,
             with_payload=True,
         )
@@ -222,6 +259,8 @@ class VectorDBService:
                 "text": point.payload.get("text", ""),
                 "score": point.score,
                 "source": point.payload.get("source", "unknown"),
+                "category": point.payload.get("category", "General"),
+                "extension": point.payload.get("extension", ""),
                 "page": point.payload.get("page", None),
                 "chunk_index": point.payload.get("chunk_index", None),
             })

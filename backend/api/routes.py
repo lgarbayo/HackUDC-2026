@@ -129,9 +129,12 @@ async def get_task_status(task_id: str):
 async def search_documents(
     q: str = Query(..., min_length=1, description="Texto de búsqueda"),
     top_k: int = Query(5, ge=1, le=20, description="Número de resultados"),
+    type: list[str] = Query(None, description="Filtrar por extensión (ej. .pdf, .csv)"),
+    file: str = Query(None, description="Filtrar por un archivo específico"),
+    category: list[str] = Query(None, description="Filtrar por categoría (ej. RRHH, Finanzas)"),
 ):
     """
-    Búsqueda semántica sobre los documentos indexados.
+    Búsqueda semántica sobre los documentos indexados, con filtros opcionales.
 
     Vectoriza la query, busca en Qdrant por similitud coseno,
     y devuelve los top_k chunks más relevantes.
@@ -140,8 +143,21 @@ async def search_documents(
         Lista de resultados con: text, score, source.
     """
     try:
+        # Construir el diccionario de filtros
+        filters = {}
+        if type:
+            filters["extension"] = type
+        if file:
+            filters["source"] = file
+        if category:
+            filters["category"] = category
+
         vdb = VectorDBService()
-        results = vdb.search(query=q, top_k=top_k)
+        results = vdb.search(
+            query=q, 
+            top_k=top_k,
+            filters=filters
+        )
 
         return {
             "query": q,

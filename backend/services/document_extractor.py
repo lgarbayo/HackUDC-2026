@@ -8,12 +8,13 @@ Soporta múltiples formatos:
   - XLSX → openpyxl, convierte filas a texto
 
 Pipeline:
-  extract_text() → clean_text() → chunk_text() → deduplicate_chunks()
+  extract_document_content() → clean_text() → chunk_text() → deduplicate_chunks()
 """
 
 import csv
 import hashlib
 import io
+import os
 import re
 from pathlib import Path
 
@@ -23,9 +24,9 @@ import fitz  # PyMuPDF
 SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".csv", ".xlsx"}
 
 
-def extract_text(file_path: str) -> str:
+def extract_document_content(file_path: str) -> tuple[str, dict]:
     """
-    Extrae texto de un archivo según su extensión.
+    Extrae texto y metadatos básicos de un archivo.
 
     Formatos soportados: PDF, TXT, CSV, XLSX.
 
@@ -33,7 +34,8 @@ def extract_text(file_path: str) -> str:
         file_path: Ruta absoluta al archivo.
 
     Returns:
-        Texto crudo extraído del documento.
+        Tupla (texto_crudo, metadatos_dict).
+        Metadatos incluye: file_size, category, extension.
 
     Raises:
         FileNotFoundError: Si el archivo no existe.
@@ -63,7 +65,49 @@ def extract_text(file_path: str) -> str:
     if not text.strip():
         raise ValueError(f"El archivo no contiene texto extraíble: {file_path}")
 
-    return text
+    # Extraer metadatos
+    file_size = os.path.getsize(file_path)
+    category = _infer_category(text, ext)
+
+    metadata = {
+        "extension": ext,
+        "file_size_bytes": file_size,
+        "category": category,
+    }
+
+    return text, metadata
+
+
+def _infer_category(text: str, ext: str) -> str:
+    """
+    Infiere la categoría corporativa usando heurísticas (palabras clave en español).
+    """
+    text_lower = text[:5000].lower()  # Solo miramos los primeros 5000 caracteres por velocidad
+    
+    categories = {
+        "RRHH": ["vacaciones", "nómina", "contrato", "empleado", "salario", "despido", "baja", "ausencia", "beneficios"],
+        "Finanzas": ["factura", "iva", "balance", "gastos", "presupuesto", "ingresos", "contabilidad", "fiscal", "pago"],
+        "Legal": ["acuerdo", "confidencialidad", "ley", "decreto", "demanda", "litigio", "cláusula", "poder", "notario"],
+        "Técnico": ["api", "servidor", "base de datos", "código", "despliegue", "arquitectura", "software", "hardware"],
+    }
+    
+    scores = {cat: 0 for cat in categories}
+    
+    for cat, keywords in categories.items():
+        for kw in keywords:
+            scores[cat] += text_lower.count(kw)
+            
+    # Extra: si es CSV/XLSX, suele ser datos o finanzas
+    if ext in [".csv", ".xlsx"] and scores["Finanzas"] == 0:
+        scores["Finanzas"] += 1
+        
+    best_category = max(scores, key=scores.get)
+    
+    # Si no hay matches suficientes, es General
+    if scores[best_category] == 0:
+        return "General"
+        
+    return best_category
 
 
 def _extract_pdf(file_path: str) -> str:

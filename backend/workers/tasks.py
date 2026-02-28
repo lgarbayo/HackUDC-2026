@@ -14,11 +14,9 @@ Se dispara desde el endpoint POST /api/upload con:
 """
 
 import logging
-from pathlib import Path
-
 from workers.celery_app import celery_app
 from services.document_extractor import (
-    extract_text,
+    extract_document_content,
     clean_text,
     chunk_text,
     deduplicate_chunks,
@@ -47,11 +45,11 @@ def process_document(self, file_path: str, original_filename: str) -> dict:
           - unique_chunks: chunks tras deduplicación
     """
     try:
-        # ── Paso 1: Extraer texto ──
+        # ── Paso 1: Extraer texto y metadatos ──
         self.update_state(state="PROCESSING", meta={"step": "extracting_text"})
-        logger.info(f"📄 Extrayendo texto de: {original_filename}")
-        raw_text = extract_text(file_path)
-        logger.info(f"   → {len(raw_text)} caracteres extraídos")
+        logger.info(f"📄 Extrayendo contenido de: {original_filename}")
+        raw_text, doc_metadata = extract_document_content(file_path)
+        logger.info(f"   → {len(raw_text)} caracteres extraídos. Categoría: {doc_metadata.get('category')}")
 
         # ── Paso 2: Limpiar ──
         self.update_state(state="PROCESSING", meta={"step": "cleaning_text"})
@@ -79,14 +77,16 @@ def process_document(self, file_path: str, original_filename: str) -> dict:
         vdb = VectorDBService()
         vdb.ensure_collection()
 
-        # Crear metadata para cada chunk
-        metadata = [
-            {
+        # Crear metadata para cada chunk combinando los globales del doc
+        metadata = []
+        for i in range(len(chunks)):
+            chunk_meta = {
                 "source": original_filename,
                 "chunk_index": i,
             }
-            for i in range(len(chunks))
-        ]
+            # Añadir metadatos deducidos (category, file_size, extension)
+            chunk_meta.update(doc_metadata)
+            metadata.append(chunk_meta)
 
         inserted = vdb.upsert(chunks=chunks, metadata=metadata)
         logger.info(f"✅ {inserted} vectores insertados en Qdrant")
