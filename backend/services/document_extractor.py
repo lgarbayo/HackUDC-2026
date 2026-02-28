@@ -74,7 +74,7 @@ def extract_document_content(file_path: str) -> tuple[str, dict]:
         ".jpeg": _extract_img,
     }
 
-    text = extractors[ext](file_path)
+    text, extra_meta = extractors[ext](file_path)
 
     if not text.strip():
         raise ValueError(f"El archivo no contiene texto extraíble: {file_path}")
@@ -88,6 +88,10 @@ def extract_document_content(file_path: str) -> tuple[str, dict]:
         "file_size_bytes": file_size,
         "category": category,
     }
+    
+    # Combinar con los metadatos específicos del extractor (ej. autor de PDF)
+    if extra_meta:
+        metadata.update(extra_meta)
 
     return text, metadata
 
@@ -168,12 +172,21 @@ def _infer_category(text: str, ext: str, filename: str = "") -> str:
     return best_category
 
 
-def _extract_pdf(file_path: str) -> str:
+def _extract_pdf(file_path: str) -> tuple[str, dict]:
     """Extrae texto de un PDF usando PyMuPDF. Si falla o no encuentra texto útil, usa OCR."""
     try:
         doc = fitz.open(file_path)
     except Exception as e:
         raise ValueError(f"No se pudo abrir el PDF: {e}")
+
+    # Extraer metadatos nativos del PDF
+    pdf_meta = {}
+    if doc.metadata:
+        for key in ["author", "creator", "title", "subject", "keywords", "producer"]:
+            val = doc.metadata.get(key)
+            if val and isinstance(val, str) and val.strip():
+                # Normalizar nombres de metadatos (ej., creator -> empresa/software)
+                pdf_meta[key.lower()] = val.strip()
 
     text_parts = []
     for page in doc:
@@ -204,10 +217,10 @@ def _extract_pdf(file_path: str) -> str:
         except Exception as e:
             logger.warning(f"Fallo en el OCR fallback para {file_path}: {e}")
 
-    return extracted_text
+    return extracted_text, pdf_meta
 
 
-def _extract_img(file_path: str) -> str:
+def _extract_img(file_path: str) -> tuple[str, dict]:
     """Extrae texto de una imagen nativa (PNG, JPG) usando Tesseract OCR."""
     if not OCR_AVAILABLE:
         raise ValueError("Tesseract OCR no está instalado. No se pueden procesar imágenes puras.")
@@ -220,18 +233,18 @@ def _extract_img(file_path: str) -> str:
         
         # OSD (Orientation and Script Detection) forzar auto-rotación si no hay EXIF (--psm 1)
         extracted_text = pytesseract.image_to_string(img, lang="spa+eng", config="--psm 1")
-        return extracted_text
+        return extracted_text, {}
     except Exception as e:
         raise ValueError(f"Fallo al realizar OCR sobre la imagen: {e}")
 
 
-def _extract_txt(file_path: str) -> str:
+def _extract_txt(file_path: str) -> tuple[str, dict]:
     """Lee un archivo de texto plano."""
     with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-        return f.read()
+        return f.read(), {}
 
 
-def _extract_csv(file_path: str) -> str:
+def _extract_csv(file_path: str) -> tuple[str, dict]:
     """
     Lee un CSV y lo convierte en texto legible.
     Cada fila se convierte en: "columna1: valor1 | columna2: valor2 | ..."
@@ -244,10 +257,10 @@ def _extract_csv(file_path: str) -> str:
             parts = [f"{key}: {value}" for key, value in row.items() if value]
             lines.append(" | ".join(parts))
 
-    return "\n".join(lines)
+    return "\n".join(lines), {}
 
 
-def _extract_xlsx(file_path: str) -> str:
+def _extract_xlsx(file_path: str) -> tuple[str, dict]:
     """
     Lee un XLSX y lo convierte en texto legible.
     Usa los headers como claves, igual que CSV.
@@ -282,7 +295,7 @@ def _extract_xlsx(file_path: str) -> str:
                 all_text.append(" | ".join(parts))
 
     wb.close()
-    return "\n".join(all_text)
+    return "\n".join(all_text), {}
 
 
 def clean_text(text: str) -> str:

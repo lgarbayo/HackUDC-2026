@@ -1669,6 +1669,14 @@
         metaHtml += `<span class="dd-badge info">📝 ${doc.wordCount.toLocaleString()} palabras</span>`;
         metaHtml += `<span class="dd-badge info">🧩 ${doc.totalChunks} chunks</span>`;
         if (doc.fileSize) metaHtml += `<span class="dd-badge info">💾 ${formatSize(doc.fileSize)}</span>`;
+        
+        // Extended rich metadata
+        if (doc.author) metaHtml += `<span class="dd-badge">👤 Autor: ${esc(doc.author)}</span>`;
+        if (doc.creator) metaHtml += `<span class="dd-badge">🏢 Empresa: ${esc(doc.creator)}</span>`;
+        if (doc.subject) metaHtml += `<span class="dd-badge">📌 Asunto: ${esc(doc.subject)}</span>`;
+        if (doc.producer) metaHtml += `<span class="dd-badge">⚙️ Productor: ${esc(doc.producer)}</span>`;
+        if (doc.keywords) metaHtml += `<span class="dd-badge">🔑 Keywords: ${esc(doc.keywords)}</span>`;
+
         $('ddMeta').innerHTML = metaHtml;
 
         // Render documento original embebido o texto crudo

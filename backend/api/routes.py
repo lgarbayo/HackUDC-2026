@@ -251,22 +251,43 @@ async def search_documents(
 
 from fastapi.responses import FileResponse
 
+def _find_file_on_disk(source: str) -> Path | None:
+    """Intenta encontrar el archivo físico, ya sea absoluto, relativo o solo por nombre."""
+    file_path = Path(source)
+    if file_path.exists() and file_path.is_file():
+        return file_path
+
+    # Fallback 1: Docker absolute to local relative
+    if str(file_path).startswith("/app/datasets/"):
+        rel_path = str(file_path)[len("/app/datasets/"):]
+        local_path = Path("../datasets") / rel_path
+        if local_path.exists() and local_path.is_file():
+            return local_path
+            
+    # Fallback 2: Es solo un nombre de archivo (o no se encontró la ruta absoluta).
+    # Buscamos en las carpetas de datos conocidas.
+    search_dirs = ["/app/datasets", "/app/uploads", "../datasets", "../uploads"]
+    filename_to_find = file_path.name
+    
+    for d in search_dirs:
+        dir_path = Path(d)
+        if not dir_path.exists() or not dir_path.is_dir():
+            continue
+        for root, _, files in os.walk(str(dir_path)):
+            if filename_to_find in files:
+                found = Path(root) / filename_to_find
+                return found
+
+    return None
+
 @router.get("/document/view", tags=["Documentos"])
 async def view_document(source: str = Query(..., description="Ruta del archivo fuente")):
     """
     Sirve el archivo original directamente para visualizarlo (PDF, Imagen, etc.).
     """
-    file_path = Path(source)
+    file_path = _find_file_on_disk(source)
     
-    # Fallback para desarrollo local: si la BD (en Docker) guardó '/app/datasets/docs/archivo.pdf'
-    # pero FastAPI se está ejecutando en el Mac, buscar en '../datasets/docs/archivo.pdf'
-    if not file_path.exists() and str(file_path).startswith("/app/datasets/"):
-        relative_path = str(file_path)[len("/app/datasets/"):]
-        local_path = Path("../datasets") / relative_path
-        if local_path.exists():
-            file_path = local_path
-
-    if not file_path.exists() or not file_path.is_file():
+    if not file_path:
         raise HTTPException(status_code=404, detail="El archivo original ya no existe en disco.")
         
     return FileResponse(path=file_path)
@@ -286,15 +307,9 @@ async def get_document_detail(source: str = Query(..., description="Ruta del arc
         # Reconstruir texto completo
         full_text = "\n\n".join([c["text"] for c in chunks])
 
-        # Obtener tamaño del archivo si existe (incluyendo fallback local)
-        file_path = Path(source)
-        if not file_path.exists() and str(file_path).startswith("/app/datasets/"):
-            relative_path = str(file_path)[len("/app/datasets/"):]
-            local_path = Path("../datasets") / relative_path
-            if local_path.exists():
-                file_path = local_path
-                
-        file_size = file_path.stat().st_size if file_path.exists() else None
+        # Obtener tamaño del archivo si existe (usando el helper)
+        file_path = _find_file_on_disk(source)
+        file_size = file_path.stat().st_size if file_path else None
 
         # Metadatos
         ext = file_path.suffix.lower()
@@ -302,20 +317,25 @@ async def get_document_detail(source: str = Query(..., description="Ruta del arc
             ".pdf": "pdf", ".txt": "pdf", ".csv": "invoice",
             ".xlsx": "invoice", ".png": "pdf", ".jpg": "pdf", ".jpeg": "pdf",
         }
+        first_chunk = chunks[0] if chunks else {}
 
         return {
             "source": source,
             "title": file_path.stem.replace("_", " ").title(),
             "extension": ext,
             "type": type_map.get(ext, "pdf"),
-            "category": chunks[0].get("category", "General") if chunks else "General",
+            "category": first_chunk.get("category", "General"),
             "totalChunks": len(chunks),
             "wordCount": len(full_text.split()),
             "fileSize": file_size,
+            "author": first_chunk.get("author"),
+            "creator": first_chunk.get("creator"),
+            "subject": first_chunk.get("subject"),
+            "keywords": first_chunk.get("keywords"),
+            "producer": first_chunk.get("producer"),
             "chunks": [{"text": c["text"], "chunkIndex": c.get("chunk_index"), "page": c.get("page")} for c in chunks],
             "fullText": full_text,
         }
-
     except HTTPException:
         raise
     except Exception as e:
