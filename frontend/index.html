@@ -1396,6 +1396,8 @@
       const active = activeFilters.includes(t);
       btn.classList.toggle('chip--active', active);
       btn.setAttribute('aria-pressed', String(active));
+      // Re-ejecutar búsqueda automáticamente si ya hay una query activa
+      if (currentQuery) performSearch(currentQuery);
     }
 
     /* ── History ───────────────────────────────────────────── */
