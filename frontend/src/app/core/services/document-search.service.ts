@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { catchError, finalize } from 'rxjs/operators';
 
@@ -17,15 +17,25 @@ export class DocumentSearchService {
   readonly isLoading$: Observable<boolean> = this._isLoading$.asObservable();
   readonly error$: Observable<string | null> = this._error$.asObservable();
 
-  private readonly apiUrl = `${environment.apiBaseUrl}/api/v1/search`;
+  private readonly apiUrl = `${environment.apiBaseUrl}/api/search`;
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient) { }
 
   search(request: SearchRequest): Observable<SearchResponse> {
     this._isLoading$.next(true);
     this._error$.next(null);
 
-    return this.http.get<SearchResponse>(this.apiUrl).pipe(
+    let params = new HttpParams()
+      .set('q', request.query)
+      .set('top_k', (request.pageSize || 5).toString());
+
+    if (request.filters?.documentTypes?.length) {
+      request.filters.documentTypes.forEach(type => {
+        params = params.append('type', type);
+      });
+    }
+
+    return this.http.get<SearchResponse>(this.apiUrl, { params }).pipe(
       catchError((err: Error) => {
         this._error$.next(err.message);
         throw err;
