@@ -306,39 +306,60 @@ async def search_documents(
                 # Si falla la extracción, continuar con resultados originales (vacíos o no)
                 pass
 
-        # Transformar al formato SearchResponse del frontend
-        results = []
+        # ── Agrupar resultados por documento (source) ──
+        from collections import OrderedDict
+        grouped: dict[str, dict] = OrderedDict()
+
         for r in raw_results:
             source = r.get("source", "unknown")
-            ext = Path(source).suffix.lower().lstrip(".")  # "pdf", "csv", etc.
-
-            # Construir DocumentMetadata
-            now_iso = datetime.now(timezone.utc).isoformat()
-            document = {
-                "id": str(uuid.uuid4()),
-                "title": Path(source).stem.replace("_", " ").title(),
-                "type": r.get("category", "General"),
-                "source": source,
-                "author": None,
-                "createdAt": now_iso,
-                "updatedAt": now_iso,
-                "tags": [ext.upper()] if ext else [],
-                "sizeBytes": None,
-            }
-
-            # Construir HighlightedFragment
             text = r.get("text", "")
+            score = r.get("score", 0.0)
+
             fragment = {
                 "text": text,
                 "highlights": _find_highlights(text, q),
                 "pageNumber": r.get("page"),
+                "score": score,
             }
 
+            if source not in grouped:
+                ext = Path(source).suffix.lower().lstrip(".")
+                now_iso = datetime.now(timezone.utc).isoformat()
+                grouped[source] = {
+                    "document": {
+                        "id": str(uuid.uuid4()),
+                        "title": Path(source).stem.replace("_", " ").title(),
+                        "type": r.get("category", "General"),
+                        "source": source,
+                        "author": None,
+                        "createdAt": now_iso,
+                        "updatedAt": now_iso,
+                        "tags": [ext.upper()] if ext else [],
+                        "sizeBytes": None,
+                    },
+                    "fragments": [],
+                    "relevanceScore": score,
+                }
+
+            entry = grouped[source]
+            entry["fragments"].append(fragment)
+            # Mantener el score más alto como score del documento
+            if score > entry["relevanceScore"]:
+                entry["relevanceScore"] = score
+
+        # Construir la lista final ordenada por relevancia del documento
+        results = []
+        for entry in grouped.values():
+            # Ordenar fragmentos por score descendente
+            entry["fragments"].sort(key=lambda f: f.get("score", 0), reverse=True)
             results.append({
-                "document": document,
-                "fragment": fragment,
-                "relevanceScore": r.get("score", 0.0),
+                "document": entry["document"],
+                "fragments": entry["fragments"],
+                "matchCount": len(entry["fragments"]),
+                "relevanceScore": entry["relevanceScore"],
             })
+
+        results.sort(key=lambda r: r["relevanceScore"], reverse=True)
 
         duration_ms = int((time.time() - start_time) * 1000)
 
