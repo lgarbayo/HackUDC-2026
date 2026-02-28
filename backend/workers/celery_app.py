@@ -39,4 +39,7 @@ celery_app.conf.update(
 
     # Resultados expiran en 1 hora
     result_expires=3600,
+
+    # Evitar CPendingDeprecationWarning en Celery 6.0+
+    broker_connection_retry_on_startup=True,
 )

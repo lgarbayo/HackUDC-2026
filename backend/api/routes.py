@@ -20,6 +20,7 @@ from fastapi.responses import JSONResponse
 from workers.tasks import process_document
 from services.vector_db import VectorDBService
 from services.document_extractor import SUPPORTED_EXTENSIONS, normalize_query
+from services.llm_expander import expand_query_async
 from core.config import settings
 from celery.result import AsyncResult
 
@@ -133,9 +134,18 @@ async def search_documents(
     q: str = Query(..., min_length=1, description="Texto de búsqueda"),
     top_k: int = Query(5, ge=1, le=20, description="Número de resultados"),
     type: list[str] = Query(None, description="Filtrar por tipo de documento"),
+    expand: bool = Query(False, description="Activar expansión de consulta con LLM"),
 ):
     """
     Búsqueda semántica sobre los documentos indexados.
+
+    Modos de búsqueda:
+      1. Normal: Búsqueda directa con la consulta del usuario
+      2. Descriptiva (expand=true): Expande la consulta con LLM local (Qwen2.5-0.5B)
+         para extraer palabras clave técnicas y mejorar resultados
+
+    Fallback automático: Si la búsqueda normal no devuelve resultados,
+    se activa automáticamente el modo descriptivo.
 
     Devuelve respuesta en el formato esperado por el frontend Angular:
     SearchResponse { results, total, page, pageSize, durationMs, queryEchoed }
@@ -182,7 +192,58 @@ async def search_documents(
             }
 
         vdb = VectorDBService()
+        
+        # 🔍 MODO DE BÚSQUEDA POR PALABRAS CLAVE (KeyBERT)
+        # Estrategia:
+        #   1. Si expand=true → extraer keywords de la query y COMBINAR resultados
+        #      (query original + keywords) para maximizar cobertura hasta top_k
+        #   2. Si expand=false → búsqueda normal; fallback a keywords si no hay resultados
+        #
+        # Nota: KeyBERT extrae el núcleo semántico de la query (no genera términos nuevos),
+        # por eso combinar ambas búsquedas es más efectivo que reemplazar una por otra.
+
+        extracted_keywords = None
+        use_expansion = expand
+
+        # Búsqueda inicial con query normalizada
         raw_results = await vdb.search(query=q_normalized, top_k=top_k, filters=filters if filters else None)
+
+        # Activar extracción automáticamente si no hay resultados
+        if not raw_results and not use_expansion:
+            logger.info(f"🤖 Sin resultados para '{q}', activando extracción de palabras clave...")
+            use_expansion = True
+
+        # Si se activó la extracción (manual o automática)
+        if use_expansion:
+            try:
+                logger.info(f"🔑 Extrayendo palabras clave de: '{q}'")
+                extracted_keywords = await expand_query_async(q, max_keywords=5)
+                logger.info(f"✅ Palabras clave extraídas: '{extracted_keywords}'")
+
+                # Buscar con las keywords extraídas
+                keyword_results = await vdb.search(
+                    query=extracted_keywords,
+                    top_k=top_k,
+                    filters=filters if filters else None
+                )
+
+                if raw_results and keyword_results:
+                    # MERGE: combinar ambos resultados, deduplicar por texto y limitar a top_k
+                    seen_texts: set[str] = {r.get("text", "") for r in raw_results}
+                    for kr in keyword_results:
+                        if kr.get("text", "") not in seen_texts:
+                            raw_results.append(kr)
+                            seen_texts.add(kr.get("text", ""))
+                    # Reordenar por score descendente y truncar
+                    raw_results = sorted(raw_results, key=lambda r: r.get("score", 0.0), reverse=True)[:top_k]
+                    logger.info(f"🔀 Resultados combinados: {len(raw_results)} (query + keywords)")
+                elif keyword_results:
+                    # Solo teníamos keywords results (fallback)
+                    raw_results = keyword_results
+            except Exception as e:
+                logger.error(f"❌ Error en extracción de palabras clave: {e}")
+                # Si falla la extracción, continuar con resultados originales (vacíos o no)
+                pass
 
         # Transformar al formato SearchResponse del frontend
         results = []
@@ -220,7 +281,7 @@ async def search_documents(
 
         duration_ms = int((time.time() - start_time) * 1000)
 
-        return {
+        response = {
             "results": results,
             "total": len(results),
             "page": 1,
@@ -228,6 +289,15 @@ async def search_documents(
             "durationMs": duration_ms,
             "queryEchoed": q,
         }
+        
+        # Agregar metadata sobre extracción de palabras clave (si se usó)
+        if use_expansion:
+            response["searchMode"] = "descriptive"
+            response["expandedQuery"] = extracted_keywords or ""
+        else:
+            response["searchMode"] = "normal"
+
+        return response
 
     except Exception as e:
         logger.error(f"❌ Error en búsqueda: {e}")
