@@ -14,7 +14,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, Query
+from fastapi import APIRouter, UploadFile, File, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
 from workers.tasks import process_document
@@ -131,6 +131,7 @@ async def get_task_status(task_id: str):
 
 @router.get("/search", tags=["Búsqueda"])
 async def search_documents(
+    request: Request,
     q: str = Query(..., min_length=1, description="Texto de búsqueda"),
     top_k: int = Query(30, ge=1, le=1000, description="Número de resultados"),
     type: list[str] = Query(None, description="Filtrar por tipo de documento"),
@@ -189,9 +190,25 @@ async def search_documents(
                 
         exact_filters = {}
         if author:
-            # MatchThext is helpful, but we can do a simplified case insensitive exact or array match
-            # For exact filter using MatchValue, it works better if the UI sends the exact string or we just pass the raw input.
-            exact_filters["author"] = author
+            # Map top-level `author` query param explicitly to the `Author` field inside ExifTool metadata
+            exact_filters["exif_metadata.Author"] = author
+
+        # Dynamic ExifTool Filters
+        # Any query param starting with 'exif_' will be treated as an exact match for exif_metadata.{Key}
+        for key, value in request.query_params.items():
+            if key.startswith("exif_") and value:
+                real_key = key[5:] # remove "exif_"
+                
+                # Inferencia básica de tipos para que MatchValue de Qdrant coincida
+                if value.isdigit():
+                    value = int(value)
+                else:
+                    try:
+                        value = float(value)
+                    except ValueError:
+                        pass # dejarlo como string
+                        
+                exact_filters[f"exif_metadata.{real_key}"] = value
 
         range_filters = {}
         if min_size is not None or max_size is not None:
@@ -240,6 +257,8 @@ async def search_documents(
             query_text=q_normalized,
             top_k=top_k,
             filters=filters if filters else None,
+            range_filters=range_filters if range_filters else None,
+            exact_filters=exact_filters if exact_filters else None
         )
 
         # Activar extracción automáticamente si no hay resultados

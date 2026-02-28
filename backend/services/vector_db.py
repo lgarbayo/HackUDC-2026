@@ -331,6 +331,8 @@ class VectorDBService:
         query_text: str,
         top_k: int = 5,
         filters: dict = None,
+        range_filters: dict = None,
+        exact_filters: dict = None,
     ) -> list[dict]:
         """
         Búsqueda híbrida: semántica + léxica en paralelo con fusión de resultados.
@@ -355,36 +357,47 @@ class VectorDBService:
         query_embedding = embeddings[0]
 
         # Construir filtros base (category, extension, etc.)
-        base_conditions = []
+        should_conditions = []
         if filters:
             for key, value in filters.items():
                 if not value:
                     continue
                 if isinstance(value, list):
                     for v in value:
-                        base_conditions.append(FieldCondition(key=key, match=MatchValue(value=v)))
+                        should_conditions.append(FieldCondition(key=key, match=MatchValue(value=v)))
                 else:
-                    base_conditions.append(FieldCondition(key=key, match=MatchValue(value=value)))
+                    should_conditions.append(FieldCondition(key=key, match=MatchValue(value=value)))
+
+        must_conditions = []
+        # Support for ExifTool Ranges (sizes, years)
+        if range_filters:
+            for field, bounds in range_filters.items():
+                range_args = {}
+                if "gte" in bounds:
+                    range_args["gte"] = bounds["gte"]
+                if "lte" in bounds:
+                    range_args["lte"] = bounds["lte"]
+                must_conditions.append(FieldCondition(key=field, range=Range(**range_args)))
+                
+        # Support for ExifTool Exact matches (Author, dynamic metadata)
+        if exact_filters:
+            for field, value in exact_filters.items():
+                must_conditions.append(FieldCondition(key=field, match=MatchValue(value=value)))
 
         # Filtro para búsqueda semántica pura
-        semantic_filter = Filter(should=base_conditions) if base_conditions else None
+        semantic_filter = Filter(
+            should=should_conditions if should_conditions else None,
+            must=must_conditions if must_conditions else None
+        ) if (should_conditions or must_conditions) else None
 
         # Filtro para búsqueda léxica: base + MatchText
-        lexical_conditions = list(base_conditions)  # copia
-        lexical_conditions.append(
-            FieldCondition(key="text", match=MatchText(text=query_text))
+        lexical_must = list(must_conditions)
+        lexical_must.append(FieldCondition(key="text", match=MatchText(text=query_text)))
+
+        lexical_filter = Filter(
+            should=should_conditions if should_conditions else None,
+            must=lexical_must
         )
-        # Si hay filtros base, la palabra debe aparecer Y coincidir con algún filtro
-        # Si no hay filtros base, solo la palabra
-        if base_conditions:
-            lexical_filter = Filter(
-                must=[FieldCondition(key="text", match=MatchText(text=query_text))],
-                should=base_conditions,
-            )
-        else:
-            lexical_filter = Filter(
-                must=[FieldCondition(key="text", match=MatchText(text=query_text))]
-            )
 
         # Ejecutar ambas búsquedas en paralelo
         semantic_task = asyncio.to_thread(
