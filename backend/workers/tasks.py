@@ -57,6 +57,17 @@ def process_document(self, file_path: str, original_filename: str) -> dict:
         cleaned_text = clean_text(raw_text)
         logger.info(f"   → {len(cleaned_text)} caracteres tras limpieza")
 
+        # ── Paso 2b: Generar resumen con LLM (no bloqueante — best-effort) ──
+        self.update_state(state="PROCESSING", meta={"step": "summarizing"})
+        summary = ""
+        try:
+            from services.llm_service import get_llm_service
+            llm = get_llm_service()
+            summary = llm.summarize(cleaned_text[:5000])
+            logger.info(f"📝 Resumen generado: {len(summary)} caracteres")
+        except Exception as e:
+            logger.warning(f"⚠️  Resumen LLM no disponible ({type(e).__name__}): {e}")
+
         # ── Paso 3: Fragmentar ──
         self.update_state(state="PROCESSING", meta={"step": "chunking"})
         logger.info(f"✂️  Fragmentando (size={settings.CHUNK_SIZE}, overlap={settings.CHUNK_OVERLAP})...")
@@ -83,6 +94,7 @@ def process_document(self, file_path: str, original_filename: str) -> dict:
             chunk_meta = {
                 "source": original_filename,
                 "chunk_index": i,
+                "summary": summary,
             }
             # Añadir metadatos deducidos (category, file_size, extension)
             chunk_meta.update(doc_metadata)

@@ -1286,10 +1286,75 @@
       color: rgba(255, 255, 255, 0.6);
       margin: 0;
     }
+
+    /* ── Document Chat Panel ──────────────────── */
+    .dd-chat-toggle {
+      display: flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border-radius: 6px;
+      background: #fca311; border: none; cursor: pointer;
+      font-size: 0.8rem; font-weight: 700; color: #14213d;
+      white-space: nowrap; flex-shrink: 0;
+    }
+    .dd-chat-toggle:hover { opacity: 0.85; }
+    .dd-chat-messages {
+      display: flex; flex-direction: column; gap: 8px;
+      max-height: 200px; overflow-y: auto; padding-right: 4px;
+    }
+    .dd-chat-bubble {
+      padding: 8px 12px; border-radius: 10px;
+      font-size: 0.875rem; line-height: 1.55; max-width: 88%; word-break: break-word;
+    }
+    .dd-chat-bubble--user { background: #fca311; color: #14213d; align-self: flex-end; }
+    .dd-chat-bubble--ai   { background: #fff; border: 1px solid rgba(20,33,61,.1); color: #14213d; align-self: flex-start; }
+    .dd-chat-bubble--loading { color: rgba(20,33,61,.4); font-style: italic; align-self: flex-start; }
+    .dd-chat-input {
+      flex: 1; padding: .6rem .9rem;
+      border: 1.5px solid #d1d5db; border-radius: 8px;
+      font-size: .875rem; outline: none; color: #14213d; background: #fff;
+    }
+    .dd-chat-input:focus { border-color: #fca311; }
+    .dd-chat-send {
+      padding: .6rem 1.1rem; background: #fca311; border: none;
+      border-radius: 8px; font-weight: 700; font-size: .875rem;
+      color: #14213d; cursor: pointer; white-space: nowrap;
+    }
+    .dd-chat-send:disabled { opacity: .45; cursor: not-allowed; }
+    /* ── Settings modal ──────────────────────────────────────────── */
+    dialog.settings-dialog { border: none; border-radius: 16px; padding: 2rem; width: 100%; max-width: 420px; box-shadow: 0 8px 40px rgba(0,0,0,.2); }
+    dialog.settings-dialog::backdrop { background: rgba(0,0,0,.5); }
+    .settings-dialog h2 { margin: 0 0 1.5rem; font-size: 1.2rem; font-weight: 700; color: #14213d; }
+    .settings-dialog label { display: block; font-size: .78rem; font-weight: 600; color: rgba(20,33,61,.55); margin-bottom: .3rem; margin-top: .9rem; text-transform: uppercase; letter-spacing: .4px; }
+    .settings-dialog select, .settings-dialog input[type=text], .settings-dialog input[type=password] { width: 100%; padding: .6rem .85rem; border: 1.5px solid #d1d5db; border-radius: 8px; font-size: .9rem; color: #14213d; outline: none; box-sizing: border-box; }
+    .settings-dialog select:focus, .settings-dialog input:focus { border-color: #fca311; }
+    .settings-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 1.5rem; }
+    .settings-btn-cancel { padding: .6rem 1.2rem; border: 1.5px solid #d1d5db; background: #fff; border-radius: 8px; font-size: .875rem; cursor: pointer; color: #14213d; }
+    .settings-btn-save { padding: .6rem 1.2rem; background: #fca311; border: none; border-radius: 8px; font-weight: 700; font-size: .875rem; color: #14213d; cursor: pointer; }
+    /* ── Summary panel ───────────────────────────────────────────── */
+    .dd-summary-panel { display: none; flex-direction: column; gap: 10px; padding: 16px 24px 20px; border-top: 1px solid rgba(20,33,61,.08); background: #f0f4ff; }
+    .dd-summary-text { font-size: .875rem; line-height: 1.65; color: #334155; white-space: pre-wrap; }
+    .dd-summary-loading { display: flex; align-items: center; gap: 8px; color: rgba(20,33,61,.5); font-size: .85rem; }
   </style>
 </head>
 
 <body>
+
+  <!-- LOGIN MODAL -->
+  <div id="loginModal" style="position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5);">
+    <div style="background:#ffffff;border-radius:16px;padding:2.5rem 2.5rem 2rem;width:100%;max-width:380px;box-shadow:0 8px 40px rgba(0,0,0,.2);display:flex;flex-direction:column;align-items:center;gap:1rem;">
+      <img src="assets/meiga-logo.svg" alt="Meiga" style="width:56px;height:56px;">
+      <h2 style="margin:0;font-size:1.5rem;font-weight:700;color:#14213d;">Iniciar sesión</h2>
+      <p style="margin:0;font-size:.875rem;color:#555;text-align:center;">Accede a Meiga Search con tus credenciales corporativas</p>
+      <input id="loginUser" type="text" placeholder="Usuario" autocomplete="username"
+        style="width:100%;padding:.65rem .9rem;border:1.5px solid #d1d5db;border-radius:8px;font-size:.95rem;outline:none;color:#14213d;" />
+      <input id="loginPass" type="password" placeholder="Contraseña" autocomplete="current-password"
+        style="width:100%;padding:.65rem .9rem;border:1.5px solid #d1d5db;border-radius:8px;font-size:.95rem;outline:none;color:#14213d;" />
+      <button id="loginBtn"
+        style="width:100%;padding:.7rem;background:#fca311;color:#14213d;font-weight:700;font-size:1rem;border:none;border-radius:8px;cursor:pointer;">
+        Entrar
+      </button>
+      <p id="loginError" style="display:none;margin:0;font-size:.85rem;color:#dc2626;">Usuario o contraseña incorrectos</p>
+    </div>
+  </div>
 
   <!-- DRAG OVERLAY -->
   <div id="dragOverlay" class="drag-overlay">
@@ -1335,7 +1400,10 @@
   </div>
 
   <!-- FILE MANAGER — fixed top-right -->
-  <div style="position:fixed;top:16px;right:20px;z-index:300;">
+  <div style="position:fixed;top:16px;right:20px;z-index:300;display:flex;gap:8px;align-items:center;">
+    <button id="settingsBtn" style="display:none;padding:7px 13px;background:#14213d;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:.8rem;font-weight:600;" onclick="openSettingsModal()">
+      &#9881;&#65039; Ajustes LLM
+    </button>
     <div style="position:relative;" id="fmContainer">
       <button class="fm-trigger" id="fmTriggerBtn" onclick="toggleFmMenu()" aria-label="Gestionar archivos">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
@@ -1634,11 +1702,66 @@
         <div id="ddExif"
           style="padding: 20px 28px; border-top: 1px solid rgba(20,33,61,0.08); background: #f9fafb; display: none; overflow-y: auto; max-height: 250px;">
         </div>
-        <div class="dd-source">
-          <span class="dd-source-path" id="ddSource"></span>
+        <div class="dd-source" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+          <span class="dd-source-path" id="ddSource" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+          <div style="display:flex;gap:6px;flex-shrink:0;">
+            <button class="dd-chat-toggle" id="ddSummaryToggle" onclick="toggleDocSummary()">
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M14 1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h12zM2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H2z"/>
+                <path d="M4.5 11.5A.5.5 0 0 1 5 11h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zm0-2A.5.5 0 0 1 5 9h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zm0-2A.5.5 0 0 1 5 7h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zm0-2A.5.5 0 0 1 5 5h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5z"/>
+              </svg>
+              Resumen
+            </button>
+            <button class="dd-chat-toggle" id="ddChatToggle" onclick="toggleDocChat()">
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M2.678 11.894a1 1 0 0 1 .287.801 11 11 0 0 1-.398 2c1.395-.323 2.247-.697 2.634-.893a1 1 0 0 1 .71-.074A8 8 0 0 0 8 14c3.996 0 7-2.807 7-6s-3.004-6-7-6-7 2.808-7 6c0 1.468.617 2.83 1.678 3.894"/>
+              </svg>
+              Preguntar
+            </button>
+          </div>
+        </div>
+        <!-- Summary panel -->
+        <div id="ddSummaryPanel" class="dd-summary-panel">
+          <p style="margin:0 0 4px;font-size:.75rem;font-weight:700;color:rgba(20,33,61,.45);text-transform:uppercase;letter-spacing:.5px;">&#128196; Resumen del documento</p>
+          <div id="ddSummaryContent">
+            <div class="dd-summary-loading"><div class="spinner" style="width:16px;height:16px;"></div> Generando resumen…</div>
+          </div>
+        </div>
+        <!-- Chat con el documento -->
+        <div id="ddChat" style="display:none;border-top:1px solid rgba(20,33,61,.08);padding:16px 24px 20px;background:#f9fafb;flex-direction:column;gap:10px;">
+          <p style="margin:0;font-size:.75rem;font-weight:700;color:rgba(20,33,61,.45);text-transform:uppercase;letter-spacing:.5px;">&#x1F4AC; Pregunta al documento</p>
+          <div class="dd-chat-messages" id="ddChatMessages"></div>
+          <div style="display:flex;gap:8px;">
+            <input id="ddChatInput" class="dd-chat-input" type="text" placeholder="Escribe tu pregunta sobre este documento…" />
+            <button id="ddChatSend" class="dd-chat-send" onclick="sendChatMessage()">Enviar</button>
+          </div>
         </div>
       </div>
     </div>
+
+    <!-- SETTINGS MODAL -->
+    <dialog id="settingsModal" class="settings-dialog">
+      <h2>&#9881;&#65039;&nbsp; Configuración LLM</h2>
+      <label for="settingsProvider">Proveedor</label>
+      <select id="settingsProvider" onchange="onSettingsProviderChange()">
+        <option value="local">Local — SmolLM2-135M (sin clave)</option>
+        <option value="openai">OpenAI (gpt-4o-mini)</option>
+        <option value="gemini">Google Gemini (gemini-1.5-flash)</option>
+        <option value="claude">Anthropic Claude (claude-3-haiku)</option>
+      </select>
+      <div id="settingsApiKeyRow" style="display:none;">
+        <label for="settingsApiKey">API Key</label>
+        <input id="settingsApiKey" type="password" placeholder="sk-… / AIza…" autocomplete="off" />
+      </div>
+      <div id="settingsModelRow" style="display:none;">
+        <label for="settingsModel">Modelo personalizado <span style="font-weight:400;text-transform:none;">(opcional)</span></label>
+        <input id="settingsModel" type="text" placeholder="gpt-4o / gemini-1.5-pro / claude-3-5-sonnet…" />
+      </div>
+      <div class="settings-actions">
+        <button class="settings-btn-cancel" onclick="document.getElementById('settingsModal').close()">Cancelar</button>
+        <button class="settings-btn-save" onclick="saveSettings()">Guardar</button>
+      </div>
+    </dialog>
 
     <!-- FILE EXPLORER MODAL -->
     <div class="fe-backdrop" id="feModal" style="display:none" onclick="if(event.target===this)closeExplorer()">
@@ -1679,6 +1802,43 @@
       let searchHistory = JSON.parse(localStorage.getItem('meiga-history') || '[]');
       let fmOpen = false;
       const $ = id => document.getElementById(id);
+
+      /* ── Auth ─────────────────────────────────────────────── */
+      const MEIGA_TOKEN_KEY = 'meiga_token', MEIGA_ROLE_KEY = 'meiga_role';
+      const MEIGA_LLM_PROVIDER_KEY = 'meiga_llm_provider', MEIGA_LLM_MODEL_KEY = 'meiga_llm_model';
+      function getToken() { return localStorage.getItem(MEIGA_TOKEN_KEY); }
+      function getRole()  { return localStorage.getItem(MEIGA_ROLE_KEY);  }
+      function showLoginModal() { $('loginModal').style.display = 'flex'; }
+      function applyRoleUI(role) {
+        const fm = $('fmContainer'); if (fm) fm.style.display = role === 'admin' ? '' : 'none';
+        const sb = $('settingsBtn'); if (sb) sb.style.display = role === 'admin' ? 'inline-flex' : 'none';
+      }
+      $('loginBtn').addEventListener('click', async () => {
+        const u = $('loginUser').value.trim(), p = $('loginPass').value;
+        const errEl = $('loginError'); if (errEl) errEl.textContent = '';
+        try {
+          const r = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: u, password: p })
+          });
+          if (!r.ok) { const d = await r.json(); throw new Error(d.detail || 'Credenciales incorrectas'); }
+          const d = await r.json();
+          localStorage.setItem(MEIGA_TOKEN_KEY, d.access_token);
+          localStorage.setItem(MEIGA_ROLE_KEY, d.role);
+          $('loginModal').style.display = 'none';
+          applyRoleUI(d.role);
+          showToast(`Bienvenido/a, ${u} (✓ ${d.role})`);
+        } catch (e) {
+          if (errEl) errEl.textContent = e.message;
+        }
+      });
+      $('loginPass').addEventListener('keydown', e => { if (e.key === 'Enter') $('loginBtn').click(); });
+      (function initAuth() {
+        const tok = getToken();
+        if (tok) { $('loginModal').style.display = 'none'; applyRoleUI(getRole()); }
+        else { $('loginModal').style.display = 'flex'; }
+      })();
 
       /* ── Toast ─────────────────────────────────────────────── */
       let _tt = null;
@@ -1850,6 +2010,42 @@
       function toggleFmMenu() { fmOpen = !fmOpen; $('fmPopover').style.display = fmOpen ? 'flex' : 'none'; $('fmBackdrop').style.display = fmOpen ? 'block' : 'none'; $('fmChevron').style.transform = fmOpen ? 'rotate(180deg)' : '' }
       function closeFmMenu() { fmOpen = false; $('fmPopover').style.display = 'none'; $('fmBackdrop').style.display = 'none'; $('fmChevron').style.transform = '' }
 
+      /* ── Settings modal ─────────────────────────────────────── */
+      function openSettingsModal() {
+        const savedProvider = localStorage.getItem(MEIGA_LLM_PROVIDER_KEY);
+        const savedModel    = localStorage.getItem(MEIGA_LLM_MODEL_KEY);
+        if (savedProvider) $('settingsProvider').value = savedProvider;
+        if (savedModel)    $('settingsModel').value    = savedModel;
+        onSettingsProviderChange();
+        document.getElementById('settingsModal').showModal();
+      }
+      function onSettingsProviderChange() {
+        const p = $('settingsProvider').value;
+        $('settingsApiKeyRow').style.display = p === 'local' ? 'none' : 'block';
+        $('settingsModelRow').style.display  = p === 'local' ? 'none' : 'block';
+      }
+      async function saveSettings() {
+        const provider  = $('settingsProvider').value;
+        const api_key   = $('settingsApiKey').value.trim() || null;
+        const model_name = $('settingsModel').value.trim() || null;
+        try {
+          const r = await fetch('/api/system/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
+            body: JSON.stringify({ provider, api_key, model_name })
+          });
+          if (r.status === 401) { showLoginModal(); return; }
+          if (!r.ok) { const d = await r.json(); throw new Error(d.detail || `HTTP ${r.status}`); }
+          localStorage.setItem(MEIGA_LLM_PROVIDER_KEY, provider);
+          if (model_name) localStorage.setItem(MEIGA_LLM_MODEL_KEY, model_name);
+          else localStorage.removeItem(MEIGA_LLM_MODEL_KEY);
+          document.getElementById('settingsModal').close();
+          showToast(`✅ Proveedor LLM cambiado a '${provider}'`);
+        } catch (e) {
+          showToast(`❌ ${e.message}`, 5000);
+        }
+      }
+
       /* ── Clear database ────────────────────────────────────── */
       async function clearDatabase() {
         closeFmMenu();
@@ -1982,7 +2178,10 @@
           if (minYear) p.append('min_year', minYear);
           if (maxYear) p.append('max_year', maxYear);
 
-          const r = await fetch(`/api/search?${p}`);
+          const r = await fetch(`/api/search?${p}`, {
+            headers: { 'Authorization': `Bearer ${getToken()}` }
+          });
+          if (r.status === 401) { showLoginModal(); return; }
           if (!r.ok) throw new Error(`HTTP ${r.status}`);
           const data = await r.json();
           if (!data.results || data.results.length === 0) { $('emptyText').innerHTML = `No se encontraron documentos para <strong>"${esc(q)}"</strong>`; showResultsState('empty'); return; }
@@ -2098,7 +2297,16 @@
         return out + t.slice(c);
       }
       /* ── Document Detail ──────────────────────────────────── */
+      let currentDocSource = null;
+
       async function openDocDetail(source) {
+        currentDocSource = source;
+        // Reset chat + summary state on each new document
+        $('ddChatMessages').innerHTML = '';
+        $('ddChat').style.display = 'none';
+        $('ddChatInput').value = '';
+        $('ddSummaryPanel').style.display = 'none';
+        $('ddSummaryContent').innerHTML = '<div class="dd-summary-loading"><div class="spinner" style="width:16px;height:16px;"></div> Generando resumen…</div>';
         $('ddModal').style.display = 'flex';
         $('ddTitle').textContent = 'Cargando…';
         $('ddExif').style.display = 'none';
@@ -2155,7 +2363,97 @@
 
       function closeDocDetail() {
         $('ddModal').style.display = 'none';
+        $('ddChat').style.display = 'none';
+        $('ddChatMessages').innerHTML = '';
+        $('ddSummaryPanel').style.display = 'none';
+        currentDocSource = null;
       }
+
+      function toggleDocChat() {
+        const panel = $('ddChat');
+        const isOpen = panel.style.display === 'flex';
+        panel.style.display = isOpen ? 'none' : 'flex';
+        if (!isOpen) $('ddChatInput').focus();
+      }
+
+      function toggleDocSummary() {
+        const panel = $('ddSummaryPanel');
+        const isOpen = panel.style.display === 'flex' || panel.style.display === 'block';
+        if (isOpen) {
+          panel.style.display = 'none';
+        } else {
+          panel.style.display = 'flex';
+          requestDocSummary();
+        }
+      }
+
+      async function requestDocSummary() {
+        if (!currentDocSource) return;
+        const contentEl = $('ddSummaryContent');
+        contentEl.innerHTML = '<div class="dd-summary-loading"><div class="spinner" style="width:16px;height:16px;"></div> Generando resumen…</div>';
+        try {
+          const r = await fetch(`/api/documents/summary?source=${encodeURIComponent(currentDocSource)}`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${getToken()}` }
+          });
+          if (r.status === 401) { showLoginModal(); return; }
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          const data = await r.json();
+          contentEl.innerHTML = `<div class="dd-summary-text">${esc(data.summary)}</div>`;
+        } catch (e) {
+          contentEl.innerHTML = `<div class="dd-summary-text" style="color:#e74c3c">⚠️ ${esc(e.message)}</div>`;
+        }
+      }
+
+      async function sendChatMessage() {
+        const input = $('ddChatInput');
+        const pregunta = input.value.trim();
+        if (!pregunta || !currentDocSource) return;
+
+        const send = $('ddChatSend');
+        send.disabled = true;
+        input.value = '';
+
+        // Burbuja del usuario
+        const msgs = $('ddChatMessages');
+        const userBubble = document.createElement('div');
+        userBubble.className = 'dd-chat-bubble dd-chat-bubble--user';
+        userBubble.textContent = pregunta;
+        msgs.appendChild(userBubble);
+
+        // Burbuja de espera
+        const loadingBubble = document.createElement('div');
+        loadingBubble.className = 'dd-chat-bubble dd-chat-bubble--loading';
+        loadingBubble.textContent = 'El modelo está pensando…';
+        msgs.appendChild(loadingBubble);
+        msgs.scrollTop = msgs.scrollHeight;
+
+        try {
+          const r = await fetch('/api/chat-document', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${getToken()}`
+            },
+            body: JSON.stringify({ doc_id: currentDocSource, pregunta })
+          });
+          if (r.status === 401) { showLoginModal(); return; }
+          if (!r.ok) throw new Error(`Error ${r.status}`);
+          const data = await r.json();
+
+          loadingBubble.className = 'dd-chat-bubble dd-chat-bubble--ai';
+          loadingBubble.textContent = data.answer || '(sin respuesta)';
+        } catch (e) {
+          loadingBubble.className = 'dd-chat-bubble dd-chat-bubble--ai';
+          loadingBubble.textContent = `⚠️ ${esc(e.message)}`;
+        } finally {
+          send.disabled = false;
+          msgs.scrollTop = msgs.scrollHeight;
+          input.focus();
+        }
+      }
+
+      $('ddChatInput').addEventListener('keydown', e => { if (e.key === 'Enter') sendChatMessage(); });
 
       /* ── Drag and Drop Upload ──────────────────────────────── */
       let dragCounter = 0;
@@ -2203,6 +2501,7 @@
 
           const r = await fetch('/api/upload', {
             method: 'POST',
+            headers: { 'Authorization': `Bearer ${getToken()}` },
             body: formData
           });
 

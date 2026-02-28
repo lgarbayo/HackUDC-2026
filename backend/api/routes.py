@@ -8,15 +8,22 @@ Tres endpoints:
 """
 
 import os
+import asyncio
 import logging
 import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
+<<<<<<< Updated upstream
 from fastapi import APIRouter, UploadFile, File, HTTPException, Query, Request
+=======
+from fastapi import APIRouter, UploadFile, File, HTTPException, Query, Depends
+>>>>>>> Stashed changes
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
+from api.auth import get_current_user, USERS, create_token, pwd_context
 from workers.tasks import process_document
 from services.vector_db import VectorDBService
 from services.document_extractor import SUPPORTED_EXTENSIONS, normalize_query
@@ -27,6 +34,27 @@ from celery.result import AsyncResult
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+# ═══════════════════════════════════════════════════════════════
+#  POST /api/login — Autenticación JWT
+# ═══════════════════════════════════════════════════════════════
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+@router.post("/login", tags=["Auth"])
+async def login(body: LoginRequest):
+    """
+    Autentica un usuario y devuelve un JWT.
+    Usuarios disponibles (demo): admin / empleado
+    """
+    user = USERS.get(body.username)
+    if not user or not pwd_context.verify(body.password, user["password"]):
+        raise HTTPException(status_code=401, detail="Credenciales incorrectas")
+    token = create_token(body.username, user["role"])
+    return {"access_token": token, "token_type": "bearer", "role": user["role"]}
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -141,6 +169,7 @@ async def search_documents(
     author: str = Query(None, description="Filtrar por autor del documento"),
     min_year: int = Query(None, ge=1900, description="Año mínimo de creación/modificación"),
     max_year: int = Query(None, ge=1900, description="Año máximo de creación/modificación"),
+    current_user: dict = Depends(get_current_user),
 ):
     """
     Búsqueda semántica sobre los documentos indexados.
@@ -158,6 +187,7 @@ async def search_documents(
     """
     try:
         start_time = time.time()
+        role = current_user.get("role", "normal")
 
         filters = {}
         if type:
@@ -257,8 +287,12 @@ async def search_documents(
             query_text=q_normalized,
             top_k=top_k,
             filters=filters if filters else None,
+<<<<<<< Updated upstream
             range_filters=range_filters if range_filters else None,
             exact_filters=exact_filters if exact_filters else None
+=======
+            role=role,
+>>>>>>> Stashed changes
         )
 
         # Activar extracción automáticamente si no hay resultados
@@ -279,7 +313,8 @@ async def search_documents(
                     top_k=top_k,
                     filters=filters if filters else None,
                     range_filters=range_filters if range_filters else None,
-                    exact_filters=exact_filters if exact_filters else None
+                    exact_filters=exact_filters if exact_filters else None,
+                    role=role,
                 )
 
                 # --- FIXED MERGE ---
@@ -520,6 +555,190 @@ async def get_document_detail(source: str = Query(..., description="Ruta del arc
 
 
 # ═══════════════════════════════════════════════════════════════
+#  POST /api/chat-document — Chat con documento vía LLM
+# ═══════════════════════════════════════════════════════════════
+
+class ChatDocumentRequest(BaseModel):
+    doc_id: str
+    pregunta: str
+
+
+@router.post("/chat-document", tags=["Chat"])
+async def chat_document(
+    body: ChatDocumentRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Responde una pregunta sobre un documento usando el LLM configurado.
+
+    Flujo:
+      1. Recupera todos los chunks del documento desde Qdrant (por source)
+      2. Concatena el texto como contexto (hasta 5 000 caracteres)
+      3. Llama a llm_service.chat(pregunta, contexto) en un thread
+      4. Devuelve la respuesta generada
+
+    El proveedor LLM activo se controla con la variable LLM_PROVIDER.
+    """
+    try:
+        from services.llm_service import get_llm_service
+
+        vdb = VectorDBService()
+        chunks = await vdb.get_by_source(body.doc_id)
+        if not chunks:
+            raise HTTPException(status_code=404, detail=f"Documento no encontrado: {body.doc_id}")
+
+        # Construir contexto: unir chunks ordenados por chunk_index y truncar
+        chunks_sorted = sorted(chunks, key=lambda c: c.get("chunk_index") or 0)
+        context = "\n\n".join(c["text"] for c in chunks_sorted)[:5000]
+
+        llm = get_llm_service()
+        # Llamada bloqueante al modelo → se delega a un thread del pool
+        answer = await asyncio.to_thread(llm.chat, body.pregunta, context)
+
+        return {"answer": answer, "doc_id": body.doc_id}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error en chat-document: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ═══════════════════════════════════════════════════════════════
+#  /api/documents/* — Resumen y chat por fuente de documento
+# ═══════════════════════════════════════════════════════════════
+
+@router.post("/documents/summary", tags=["Documentos"])
+async def document_summary(
+    source: str = Query(...),
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Devuelve el resumen de un documento.
+    Si ya está en caché (campo 'resumen' en Qdrant), lo devuelve directamente.
+    Si no, genera uno con el LLM activo y lo persiste para futuras llamadas.
+    """
+    try:
+        from services.llm_service import get_llm_service
+        vdb = VectorDBService()
+        chunks = await vdb.get_by_source(source)
+        if not chunks:
+            raise HTTPException(status_code=404, detail=f"Documento no encontrado: {source}")
+
+        # Cache hit: el primer chunk ya tiene resumen
+        cached = chunks[0].get("resumen")
+        if cached:
+            return {"summary": cached, "source": source, "cached": True}
+
+        # Cache miss: generar con LLM
+        chunks_sorted = sorted(chunks, key=lambda c: c.get("chunk_index") or 0)
+        full_text = "\n\n".join(c["text"] for c in chunks_sorted)[:5000]
+        llm = get_llm_service()
+        summary = await asyncio.to_thread(llm.summarize, full_text)
+
+        # Persistir en Qdrant para que quede en caché
+        await vdb.update_document_summary(source, summary)
+
+        return {"summary": summary, "source": source, "cached": False}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error en document-summary: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class DocumentChatRequest(BaseModel):
+    pregunta: str
+
+
+@router.post("/documents/chat", tags=["Documentos"])
+async def document_chat(
+    body: DocumentChatRequest,
+    source: str = Query(...),
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Chat con un documento específico.
+    source como query param, pregunta en el body JSON.
+    """
+    try:
+        from services.llm_service import get_llm_service
+        vdb = VectorDBService()
+        chunks = await vdb.get_by_source(source)
+        if not chunks:
+            raise HTTPException(status_code=404, detail=f"Documento no encontrado: {source}")
+
+        chunks_sorted = sorted(chunks, key=lambda c: c.get("chunk_index") or 0)
+        context = "\n\n".join(c["text"] for c in chunks_sorted)[:5000]
+        llm = get_llm_service()
+        answer = await asyncio.to_thread(llm.chat, body.pregunta, context)
+
+        return {"answer": answer, "source": source}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error en document-chat: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ═══════════════════════════════════════════════════════════════
+#  /api/system/settings — Configuración dinámica del LLM
+# ═══════════════════════════════════════════════════════════════
+
+class LLMSettingsRequest(BaseModel):
+    provider: str                    # "local" | "openai" | "gemini" | "claude"
+    api_key: str | None = None
+    model_name: str | None = None
+
+
+@router.post("/system/settings", tags=["Sistema"])
+async def update_llm_settings(
+    body: LLMSettingsRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Actualiza el proveedor LLM en caliente sin reiniciar el servidor.
+    Solo accesible por administradores.
+    Env vars actualizadas: LLM_PROVIDER, OPENAI_API_KEY / GEMINI_API_KEY /
+    ANTHROPIC_API_KEY, y la var de modelo correspondiente.
+    """
+    role = current_user.get("role", "normal")
+    if role != "admin":
+        raise HTTPException(status_code=403, detail="Solo los administradores pueden cambiar la configuración LLM")
+
+    valid_providers = {"local", "openai", "gemini", "claude"}
+    if body.provider not in valid_providers:
+        raise HTTPException(status_code=422, detail=f"Proveedor no válido. Opciones: {valid_providers}")
+
+    os.environ["LLM_PROVIDER"] = body.provider
+
+    if body.api_key:
+        if body.provider == "openai":
+            os.environ["OPENAI_API_KEY"] = body.api_key
+        elif body.provider == "gemini":
+            os.environ["GEMINI_API_KEY"] = body.api_key
+        elif body.provider == "claude":
+            os.environ["ANTHROPIC_API_KEY"] = body.api_key
+
+    if body.model_name:
+        if body.provider == "openai":
+            os.environ["OPENAI_LLM_MODEL"] = body.model_name
+        elif body.provider == "gemini":
+            os.environ["GEMINI_LLM_MODEL"] = body.model_name
+        elif body.provider == "claude":
+            os.environ["CLAUDE_LLM_MODEL"] = body.model_name
+
+    # Resetear el singleton para que la próxima llamada cargue el nuevo proveedor
+    from services.llm_service import LLMFactory
+    LLMFactory.reset()
+
+    logger.info(f"⚙️  LLM settings updated → provider={body.provider} by user={current_user.get('sub')}")
+    return {"ok": True, "provider": body.provider}
+
+
+# ═══════════════════════════════════════════════════════════════
 #  /api/system/* — Gestión del sistema (frontend integration)
 # ═══════════════════════════════════════════════════════════════
 
@@ -588,17 +807,18 @@ async def list_directory(path: str = Query("/app", description="Ruta a listar"))
     return {"current": str(target), "parent": parent, "items": items}
 
 
-from pydantic import BaseModel
-
 class IndexDirectoryRequest(BaseModel):
     path: str
 
 
 @router.post("/system/index-directory", tags=["Sistema"])
-async def index_directory(request: IndexDirectoryRequest):
+async def index_directory(request: IndexDirectoryRequest, current_user: dict = Depends(get_current_user)):
     """
     Escanea un directorio y dispara tareas de Celery para cada archivo soportado.
+    Solo accesible para administradores.
     """
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Solo los administradores pueden indexar directorios")
     dir_path = Path(request.path)
     if not dir_path.is_dir():
         raise HTTPException(status_code=400, detail=f"El directorio no existe: {request.path}")
