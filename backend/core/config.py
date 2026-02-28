@@ -34,8 +34,8 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
 
     # ─── Procesamiento de documentos ───
-    CHUNK_SIZE: int = 500       # Tamaño de cada fragmento (en caracteres)
-    CHUNK_OVERLAP: int = 50     # Solapamiento entre fragmentos
+    CHUNK_SIZE: int = 1000      # Tamaño de cada fragmento (en caracteres)
+    CHUNK_OVERLAP: int = 200    # Solapamiento entre fragmentos
     UPLOAD_DIR: str = "/app/uploads"
 
     class Config:

@@ -81,7 +81,7 @@ def extract_document_content(file_path: str) -> tuple[str, dict]:
 
     # Extraer metadatos
     file_size = os.path.getsize(file_path)
-    category = _infer_category(text, ext)
+    category = _infer_category(text, ext, filename=path.stem)
 
     metadata = {
         "extension": ext,
@@ -92,35 +92,79 @@ def extract_document_content(file_path: str) -> tuple[str, dict]:
     return text, metadata
 
 
-def _infer_category(text: str, ext: str) -> str:
+def _infer_category(text: str, ext: str, filename: str = "") -> str:
     """
-    Infiere la categoría corporativa usando heurísticas (palabras clave en español).
+    Infiere la categoría corporativa usando heurísticas avanzadas.
+    Combina análisis del contenido + nombre del archivo con pesos diferenciados.
     """
-    text_lower = text[:5000].lower()  # Solo miramos los primeros 5000 caracteres por velocidad
-    
+    text_lower = text[:8000].lower()
+    filename_lower = filename.lower() if filename else ""
+
     categories = {
-        "RRHH": ["vacaciones", "nómina", "contrato", "empleado", "salario", "despido", "baja", "ausencia", "beneficios"],
-        "Finanzas": ["factura", "iva", "balance", "gastos", "presupuesto", "ingresos", "contabilidad", "fiscal", "pago"],
-        "Legal": ["acuerdo", "confidencialidad", "ley", "decreto", "demanda", "litigio", "cláusula", "poder", "notario"],
-        "Técnico": ["api", "servidor", "base de datos", "código", "despliegue", "arquitectura", "software", "hardware"],
+        "RRHH": [
+            "vacaciones", "nómina", "nóminas", "contrato laboral", "empleado",
+            "salario", "despido", "baja laboral", "ausencia", "beneficios",
+            "recursos humanos", "selección", "candidato", "onboarding",
+            "teletrabajo", "jornada", "convenio", "antigüedad", "plantilla",
+            "offer letter", "puesto", "retribución", "compensación",
+        ],
+        "Finanzas": [
+            "factura", "facturación", "iva", "balance", "gastos",
+            "presupuesto", "ingresos", "contabilidad", "fiscal", "pago",
+            "pedido", "proveedor", "cobro", "deuda", "amortización",
+            "cuenta", "financiero", "trimestre", "resultado", "margen",
+            "ventas", "revenue", "coste", "precio", "descuento", "euro",
+        ],
+        "Legal": [
+            "acuerdo", "confidencialidad", "ley", "decreto", "demanda",
+            "litigio", "cláusula", "poder notarial", "notario", "nda",
+            "licitación", "pliego", "condiciones", "adjudicación",
+            "constitución", "estatutos", "escritura", "mercantil",
+            "propiedad intelectual", "rgpd", "protección de datos",
+        ],
+        "Técnico": [
+            "api", "servidor", "base de datos", "código", "despliegue",
+            "arquitectura", "software", "hardware", "firmware",
+            "iot", "sensor", "panel", "manual", "especificación",
+            "ficha técnica", "configuración", "instalación", "versión",
+        ],
+        "Comercial": [
+            "propuesta", "oferta", "cliente", "comercial", "catálogo",
+            "producto", "servicio", "proyecto", "licitación", "smart",
+            "solución", "demo", "piloto", "partnership", "colaboración",
+        ],
+        "Sostenibilidad": [
+            "sostenibilidad", "medioambiental", "emisiones", "carbono",
+            "residuos", "reciclaje", "ods", "rsc", "impacto ambiental",
+            "huella", "certificación ambiental", "iso 14001", "energía",
+        ],
+        "IT/Soporte": [
+            "incidencia", "soporte", "ticket", "resolución", "sla",
+            "equipo", "inventario", "activo", "licencia", "renovación",
+            "backup", "antivirus", "red", "vpn", "usuario",
+        ],
     }
-    
+
     scores = {cat: 0 for cat in categories}
-    
+
     for cat, keywords in categories.items():
         for kw in keywords:
+            # Peso 1× por cada aparición en el texto
             scores[cat] += text_lower.count(kw)
-            
-    # Extra: si es CSV/XLSX, suele ser datos o finanzas
-    if ext in [".csv", ".xlsx"] and scores["Finanzas"] == 0:
-        scores["Finanzas"] += 1
-        
+            # Peso 3× si la keyword aparece en el nombre del archivo
+            if kw in filename_lower:
+                scores[cat] += 3
+
+    # Extra: si es CSV/XLSX sin coincidencias claras, sesgo a Finanzas o IT/Soporte
+    if ext in [".csv", ".xlsx"]:
+        if scores["Finanzas"] == 0 and scores["IT/Soporte"] == 0:
+            scores["Finanzas"] += 1
+
     best_category = max(scores, key=scores.get)
-    
-    # Si no hay matches suficientes, es General
+
     if scores[best_category] == 0:
         return "General"
-        
+
     return best_category
 
 
@@ -259,15 +303,16 @@ def clean_text(text: str) -> str:
     return text.strip()
 
 
-def chunk_text(text: str, size: int = 500, overlap: int = 50) -> list[str]:
+def chunk_text(text: str, size: int = 1000, overlap: int = 200) -> list[str]:
     """
-    Fragmenta el texto en chunks con solapamiento.
+    Fragmenta el texto en chunks con solapamiento, respetando límites de oración.
 
-    Intenta cortar en espacios para no partir palabras.
+    Intenta cortar en finales de oración para preservar el contexto semántico.
+    Si no encuentra un final de oración, corta en el último espacio.
 
     Args:
         text: Texto limpio.
-        size: Tamaño de cada chunk (caracteres).
+        size: Tamaño máximo de cada chunk (caracteres).
         overlap: Solapamiento entre chunks.
 
     Returns:
@@ -275,6 +320,9 @@ def chunk_text(text: str, size: int = 500, overlap: int = 50) -> list[str]:
     """
     if not text:
         return []
+
+    # Separadores de oración (en orden de preferencia)
+    sentence_endings = re.compile(r'(?<=[.!?])\s+|(?<=\n)\s*')
 
     chunks = []
     start = 0
@@ -284,9 +332,22 @@ def chunk_text(text: str, size: int = 500, overlap: int = 50) -> list[str]:
         end = start + size
 
         if end < text_length:
-            last_space = text.rfind(' ', start, end)
-            if last_space > start:
-                end = last_space
+            # Buscar el último final de oración dentro del rango
+            segment = text[start:end]
+            best_break = -1
+
+            for match in sentence_endings.finditer(segment):
+                # Solo considerar quiebres que dejen un chunk razonable (>30% del tamaño)
+                if match.start() > size * 0.3:
+                    best_break = match.end()
+
+            if best_break > 0:
+                end = start + best_break
+            else:
+                # Fallback: cortar en el último espacio
+                last_space = text.rfind(' ', start, end)
+                if last_space > start:
+                    end = last_space
 
         chunk = text[start:end].strip()
         if chunk:
@@ -295,6 +356,21 @@ def chunk_text(text: str, size: int = 500, overlap: int = 50) -> list[str]:
         start = end - overlap if end < text_length else text_length
 
     return chunks
+
+
+def normalize_query(query: str) -> str:
+    """
+    Normaliza una query de búsqueda para mejorar la precisión.
+
+    Operaciones:
+      - Strip de espacios
+      - Colapsar espacios múltiples
+      - Eliminar puntuación huérfana al inicio/final
+    """
+    query = query.strip()
+    query = re.sub(r'\s+', ' ', query)
+    query = re.sub(r'^[^\w]+|[^\w]+$', '', query)
+    return query
 
 
 def deduplicate_chunks(chunks: list[str]) -> list[str]:

@@ -19,7 +19,7 @@ from fastapi.responses import JSONResponse
 
 from workers.tasks import process_document
 from services.vector_db import VectorDBService
-from services.document_extractor import SUPPORTED_EXTENSIONS
+from services.document_extractor import SUPPORTED_EXTENSIONS, normalize_query
 from core.config import settings
 from celery.result import AsyncResult
 
@@ -164,8 +164,20 @@ async def search_documents(
             if extensions:
                 filters["extension"] = extensions
 
+        # Normalizar la query
+        q_normalized = normalize_query(q)
+        if not q_normalized:
+            return {
+                "results": [],
+                "total": 0,
+                "page": 1,
+                "pageSize": top_k,
+                "durationMs": 0,
+                "queryEchoed": q,
+            }
+
         vdb = VectorDBService()
-        raw_results = await vdb.search(query=q, top_k=top_k, filters=filters if filters else None)
+        raw_results = await vdb.search(query=q_normalized, top_k=top_k, filters=filters if filters else None)
 
         # Transformar al formato SearchResponse del frontend
         results = []
@@ -356,19 +368,36 @@ async def clear_database():
 
 def _find_highlights(text: str, query: str) -> list[dict]:
     """
-    Busca ocurrencias de la query en el texto para resaltado.
+    Busca ocurrencias de cada palabra de la query en el texto para resaltado.
+    Divide la query en palabras y busca cada una individualmente.
+    Filtra palabras muy cortas (< 3 chars) para evitar ruido.
     Devuelve lista de {start, end} con las posiciones.
     """
     highlights = []
-    query_lower = query.lower()
     text_lower = text.lower()
-    start = 0
 
-    while True:
-        pos = text_lower.find(query_lower, start)
-        if pos == -1:
-            break
-        highlights.append({"start": pos, "end": pos + len(query)})
-        start = pos + 1
+    # Dividir query en palabras, filtrar muy cortas
+    words = [w for w in query.lower().split() if len(w) >= 3]
+    if not words:
+        # Fallback: buscar la query completa
+        words = [query.lower()] if query.strip() else []
 
-    return highlights
+    for word in words:
+        start = 0
+        while True:
+            pos = text_lower.find(word, start)
+            if pos == -1:
+                break
+            highlights.append({"start": pos, "end": pos + len(word)})
+            start = pos + 1
+
+    # Ordenar y eliminar solapamientos
+    highlights.sort(key=lambda h: h["start"])
+    merged = []
+    for h in highlights:
+        if merged and h["start"] <= merged[-1]["end"]:
+            merged[-1]["end"] = max(merged[-1]["end"], h["end"])
+        else:
+            merged.append(h)
+
+    return merged
