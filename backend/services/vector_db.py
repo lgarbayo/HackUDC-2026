@@ -274,3 +274,37 @@ class VectorDBService:
             })
 
         return formatted
+
+    async def get_by_source(self, source: str) -> list[dict]:
+        """
+        Recupera TODOS los chunks indexados de un archivo fuente.
+        Usa scroll (no search) para no necesitar un vector query.
+        """
+        await asyncio.to_thread(self.ensure_collection)
+
+        query_filter = Filter(
+            must=[FieldCondition(key="source", match=MatchValue(value=source))]
+        )
+
+        results, _ = await asyncio.to_thread(
+            self.client.scroll,
+            collection_name=self.collection_name,
+            scroll_filter=query_filter,
+            limit=100,
+            with_payload=True,
+        )
+
+        formatted = []
+        for point in results:
+            formatted.append({
+                "text": point.payload.get("text", ""),
+                "source": point.payload.get("source", "unknown"),
+                "category": point.payload.get("category", "General"),
+                "extension": point.payload.get("extension", ""),
+                "page": point.payload.get("page", None),
+                "chunk_index": point.payload.get("chunk_index", None),
+            })
+
+        # Ordenar por chunk_index para reconstruir el documento en orden
+        formatted.sort(key=lambda x: x.get("chunk_index", 0) or 0)
+        return formatted

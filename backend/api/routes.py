@@ -245,6 +245,57 @@ async def search_documents(
 
 
 # ═══════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════
+#  /api/document — Vista detallada de un documento indexado
+# ═══════════════════════════════════════════════════════════════
+
+@router.get("/document", tags=["Documentos"])
+async def get_document_detail(source: str = Query(..., description="Ruta del archivo fuente")):
+    """
+    Recupera todos los chunks de un documento y los reconstruye con metadatos.
+    """
+    try:
+        vdb = VectorDBService()
+        chunks = await vdb.get_by_source(source)
+
+        if not chunks:
+            raise HTTPException(status_code=404, detail=f"Documento no encontrado: {source}")
+
+        # Reconstruir texto completo
+        full_text = "\n\n".join([c["text"] for c in chunks])
+
+        # Obtener tamaño del archivo si existe
+        file_path = Path(source)
+        file_size = file_path.stat().st_size if file_path.exists() else None
+
+        # Metadatos
+        ext = file_path.suffix.lower()
+        type_map = {
+            ".pdf": "pdf", ".txt": "pdf", ".csv": "invoice",
+            ".xlsx": "invoice", ".png": "pdf", ".jpg": "pdf", ".jpeg": "pdf",
+        }
+
+        return {
+            "source": source,
+            "title": file_path.stem.replace("_", " ").title(),
+            "extension": ext,
+            "type": type_map.get(ext, "pdf"),
+            "category": chunks[0].get("category", "General") if chunks else "General",
+            "totalChunks": len(chunks),
+            "wordCount": len(full_text.split()),
+            "fileSize": file_size,
+            "chunks": [{"text": c["text"], "chunkIndex": c.get("chunk_index"), "page": c.get("page")} for c in chunks],
+            "fullText": full_text,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error obteniendo documento: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ═══════════════════════════════════════════════════════════════
 #  /api/system/* — Gestión del sistema (frontend integration)
 # ═══════════════════════════════════════════════════════════════
 
