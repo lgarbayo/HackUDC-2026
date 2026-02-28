@@ -15,11 +15,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-<<<<<<< Updated upstream
-from fastapi import APIRouter, UploadFile, File, HTTPException, Query, Request
-=======
-from fastapi import APIRouter, UploadFile, File, HTTPException, Query, Depends
->>>>>>> Stashed changes
+from fastapi import APIRouter, UploadFile, File, HTTPException, Query, Request, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -287,12 +283,8 @@ async def search_documents(
             query_text=q_normalized,
             top_k=top_k,
             filters=filters if filters else None,
-<<<<<<< Updated upstream
             range_filters=range_filters if range_filters else None,
             exact_filters=exact_filters if exact_filters else None
-=======
-            role=role,
->>>>>>> Stashed changes
         )
 
         # Activar extracción automáticamente si no hay resultados
