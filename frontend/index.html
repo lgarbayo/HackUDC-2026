@@ -1671,18 +1671,8 @@
         if (doc.fileSize) metaHtml += `<span class="dd-badge info">💾 ${formatSize(doc.fileSize)}</span>`;
         $('ddMeta').innerHTML = metaHtml;
 
-        // Render chunks
-        let bodyHtml = '';
-        doc.chunks.forEach((chunk, i) => {
-          const pageLabel = chunk.page ? ` · Pág. ${chunk.page}` : '';
-          bodyHtml += `<div class="dd-chunk">
-            <div class="dd-chunk-header">
-              <span class="dd-chunk-label">Fragmento ${i + 1}${pageLabel}</span>
-            </div>
-            <div class="dd-chunk-text">${esc(chunk.text)}</div>
-          </div>`;
-        });
-        $('ddBody').innerHTML = bodyHtml;
+        // Render documento completo (texto continuo, sin fragmentar)
+        $('ddBody').innerHTML = `<div class="dd-chunk-text">${esc(doc.fullText)}</div>`;
 
       } catch (e) {
         $('ddBody').innerHTML = `<div class="fe-empty">⚠️ ${esc(e.message)}</div>`;
