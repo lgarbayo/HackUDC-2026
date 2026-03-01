@@ -110,11 +110,17 @@ graph TD
     WORK --> EXT
     EXT --> VDB
 
-    %% Estilos
-    style Frontend fill:#e1f5fe,stroke:#01579b
-    style Backend fill:#fff3e0,stroke:#e65100
-    style Async fill:#f3e5f5,stroke:#4a148c
-    style VDB fill:#e8f5e9,stroke:#1b5e20
+    %% Estilos de alta legibilidad (Texto oscuro sobre fondo claro)
+    style Frontend fill:#e1f5fe,stroke:#01579b,color:#000
+    style Backend fill:#fff3e0,stroke:#e65100,color:#000
+    style Async fill:#f3e5f5,stroke:#4a148c,color:#000
+    style VDB fill:#e8f5e9,stroke:#1b5e20,color:#000
+    
+    style UI fill:#fff,stroke:#01579b,color:#000
+    style FAST fill:#fff,stroke:#e65100,color:#000
+    style AI fill:#fff,stroke:#e65100,color:#000
+    style WORK fill:#fff,stroke:#4a148c,color:#000
+    style EXT fill:#fff,stroke:#4a148c,color:#000
 ```
 
 > [!NOTE]
