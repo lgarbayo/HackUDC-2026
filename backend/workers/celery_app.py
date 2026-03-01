@@ -1,17 +1,18 @@
 """
-workers/celery_app.py — Configuración del Motor de Tareas Asíncronas (Celery).
+workers/celery_app.py — EL CAMARERO Y LA COCINA (Celery).
+--------------------------------------------------------
+¿Alguna vez has pedido comida en un restaurante? El camarero anota 
+tu pedido rápido para atender a otro cliente, mientras la cocina (el Worker) 
+prepara tu plato con calma.
 
-Este módulo orquestara el procesamiento en segundo plano de MeigaSearch. 
-Utiliza Redis como agente de mensajería (broker) para coordinar las tareas 
-y como almacén de resultados para rastrear el estado de la indexación.
+¡Celery es ese sistema de gestión!
+1. FastAPI (El Camarero): Recibe tu archivo y dice: "¡Pedido recibido!".
+2. Redis (La Comanda): Es la nota donde se apunta: "Hay que procesar 'doc.pdf'".
+3. Celery Worker (La Cocina): Coge la nota de Redis y se pone a trabajar 
+   en el archivo sin bloquear al camarero.
 
-Configuración técnica:
-    - Broker/Backend: Redis (URL configurada en settings).
-    - Serialización: JSON (estándar para interoperabilidad).
-    - Estabilidad: Reintentos automáticos y confirmación tardía (Acks Late).
-
-Instrucciones de ejecución (Docker):
-    celery -A workers.celery_app worker --loglevel=info
+Esto permite que la web de MeigaSearch sea súper rápida aunque subas 
+un manual de 500 páginas.
 """
 
 from celery import Celery

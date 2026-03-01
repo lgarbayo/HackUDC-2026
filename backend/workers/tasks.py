@@ -1,19 +1,16 @@
 """
-workers/tasks.py — Orquestación del Pipeline de Ingesta (Celery Tasks).
+workers/tasks.py — LA CADENA DE MONTAJE (Tareas de Celery).
+---------------------------------------------------------
+Aquí es donde ocurre el "trabajo pesado". Imagina una cadena de montaje 
+de una fábrica. Un archivo entra por un lado y sale convertido en 
+"Conocimiento Vectorial" por el otro.
 
-Este módulo define la lógica de ejecución pesada que se procesa en segundo plano 
-para evitar bloquear la API principal. Implementa una pipeline de 5 etapas para 
-transformar documentos crudos en conocimiento indexado y buscable.
-
-Etapas del Pipeline:
-    1. Extracción: Obtiene texto y metadatos (PDF, Office, Imágenes mediante OCR).
-    2. Limpieza: Normaliza el texto eliminando ruidos y artefactos de extracción.
-    3. Resumen (Best-effort): Genera una síntesis con IA para pre-visualización rápida.
-    4. Fragmentación (Chunking): Divide el texto preservando el contexto semántico.
-    5. Indexación: Vectoriza los fragmentos y los persiste en la base de datos Qdrant.
-
-Invocación:
-    Disparado asíncronamente desde los endpoints de carga de archivos.
+PASOS DE LA FÁBRICA:
+1. EXTRACCIÓN: Abrimos el archivo y leemos qué dice (incluso si es una foto).
+2. LIMPIEZA: Quitamos las "manchas" o basura del texto.
+3. RESUMEN: La IA lee rápido y nos dice de qué trata (opcional).
+4. FRAGMENTACIÓN: Cortamos el texto en trozos pequeños (chunks).
+5. INDEXACIÓN: Guardamos esos trozos en el "Cerebro" (Qdrant) para poder buscarlos.
 """
 
 import logging

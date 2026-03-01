@@ -1,27 +1,17 @@
 """
-services/vector_db.py — Capa de Persistencia Vectorial y Generación de Embeddings.
+services/vector_db.py — EL ARCHIVERO ESPACIAL (Base de Datos Vectorial).
+----------------------------------------------------------------------
+Este módulo es el que permite que la app "entienda" lo que buscas. En lugar 
+de buscar palabras exactas, buscamos por significado.
 
-Este módulo actúa como el puente entre el procesamiento de documentos y el motor 
-de búsqueda semántica Qdrant. Gestiona la transformación de texto en vectores 
-numéricos (embeddings) y su almacenamiento estructurado para permitir 
-recuperación de información a escala corporativa.
-
-Responsabilidades:
-    1. Gestión de Proveedores de Embeddings: Abstracción para alternar entre 
-       modelos locales (Sentence-Transformers) y en la nube (OpenAI).
-    2. Ciclo de Vida de Colecciones: Creación, verificación e indexación 
-       automática de colecciones en Qdrant.
-    3. Ingesta Estructurada (Upsert): Inserción masiva de fragmentos con 
-       metadatos asociados (Páginas, Autores, ExifTool).
-    4. Búsqueda Híbrida: Implementación de algoritmos de búsqueda que combinan 
-       proximidad semántica (vectores) con filtros léxicos precisos.
-    5. Seguridad (RBAC): Filtrado de resultados en base a niveles de visibilidad.
-
-Uso Sugerido:
-    vdb = VectorDBService()
-    vdb.ensure_collection()
-    vdb.upsert(chunks=["Contenido..."], metadata=[{"source": "doc.pdf"}])
-    results = await vdb.hybrid_search("consulta", "consulta_lexica")
+¿CÓMO FUNCIONA? (En 3 pasos):
+1. EMBEDDINGS: Convertimos el texto en una lista de números (coordenadas). 
+   Textos con significados similares (ej: "perro" y "can") acaban "cerca" 
+   geométricamente.
+2. QDRANT: Es nuestro almacén de coordenadas. Guarda los trozos de texto 
+   junto con su ubicación en ese mapa de significados.
+3. BÚSQUEDA HÍBRIDA: Cuando preguntas algo, buscamos "cerca" de tu pregunta 
+   pero también miramos palabras exactas. ¡Es lo mejor de ambos mundos!
 """
 
 import uuid
@@ -487,23 +477,18 @@ class VectorDBService:
         role: str = "lector",
     ) -> list[dict]:
         """
-        Ejecuta una búsqueda combinada (híbrida) para máxima precisión.
-
-        Este algoritmo combina lo mejor de dos mundos:
-            1. Búsqueda Vectorial (Semántica): Entiende conceptos y sinónimos.
-            2. Búsqueda Léxica (Palabras Clave): Encuentra términos exactos.
-
-        Los resultados que aparecen en ambas búsquedas reciben un "Boost" 
-        multiplicativo (1.15x), lo que garantiza que los documentos que 
-        coinciden exacta y semánticamente suban al top del ranking. 
-        También aplica las reglas de visibilidad RBAC.
-
-        Args:
-            query (str): Texto para la vectorización.
-            query_text (str): Texto para la coincidencia léxica.
-            top_k (int): Resultados finales a devolver.
-            filters (dict): Metadatos para filtrado previo.
-            role (str): Rol del usuario (Lector, Editor o Admin).
+        EL SÚPER BUSCADOR (Hybrid Search).
+        ----------------------------------
+        Este es el secreto de la precisión de Meiga. Combina dos técnicas:
+        
+        1. BÚSQUEDA SEMÁNTICA (GPS): Busca por concepto. Encuentra "coche" 
+           si buscas "vehículo".
+        2. BÚSQUEDA LÉXICA (Lupa): Busca la palabra exacta. Encuentra el número 
+           de serie "XYZ-123".
+        
+        ¿POR QUÉ AMBAS?
+        La semántica es genial para conversar, pero a veces falla con nombres propios 
+        o códigos técnicos. Al mezclarlas, Meiga es inteligente y precisa a la vez.
         """
         await asyncio.to_thread(self.ensure_collection)
 

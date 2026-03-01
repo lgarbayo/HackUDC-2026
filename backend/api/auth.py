@@ -1,24 +1,19 @@
 """
-api/auth.py — Autenticación JWT y Control de Acceso Basado en Roles (RBAC).
+api/auth.py — EL GUARDIÁN DEL SISTEMA (Seguridad).
+------------------------------------------------
+Este módulo es el responsable de preguntar: "¿Quién eres?" y "¿Tienes permiso?".
+Usamos un sistema de Control de Acceso Basado en Roles (RBAC) para proteger 
+el conocimiento de la empresa.
 
-Este módulo implementa una capa de seguridad robusta para la aplicación FastAPI.
-Gestiona la autenticación de usuarios, la emisión de tokens JWT, el hashing de
-contraseñas y proporciona control de acceso basado en dependencias para
-diferentes roles de usuario.
+¿CÓMO FUNCIONA EL FLUJO DE SEGURIDAD?
+1. LOGIN: El usuario envía sus credenciales. Si son correctas, le damos un "Pasaporte" (JWT).
+2. PETICIÓN: En cada acción, el usuario enseña su Pasaporte.
+3. VALIDACIÓN: Este módulo comprueba si el pasaporte es real y si aún es válido.
+4. PERMISOS: Si la acción requiere ser 'admin', y el usuario es 'lector', le denegamos el acceso.
 
-Componentes principales:
-    - Hashing de contraseñas usando bcrypt.
-    - Generación y verificación de tokens JWT.
-    - Dependencias RBAC (admin, editor, lector).
-
-Aviso de Seguridad para Producción (Mejores Prácticas OSS):
-    1. SECRET_KEY: Debe cargarse desde una variable de entorno segura o un
-       Gestor de Secretos. Nunca la incluya directamente en el repositorio.
-    2. Base de Datos: Reemplace el diccionario `USERS` en memoria por una
-       base de datos persistente (ej., PostgreSQL).
-    3. Expiración de Tokens: Ajuste el `timedelta` según la política de 
-       seguridad de su organización.
-    4. HTTPS: Los JWT deben transmitirse siempre sobre conexiones cifradas.
+PARA EL DESARROLLADOR:
+Si creas un nuevo endpoint sensible, asegúrate de añadir `Depends(require_admin)` 
+como parámetro para que nadie sin permiso pueda ejecutarlo.
 """
 
 import jwt
@@ -85,20 +80,15 @@ def create_token(username: str, role: str):
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Security(security)):
     """
-    Dependencia de FastAPI que valida el JWT de la petición entrante.
-
-    Esta función es el guardián principal para los endpoints protegidos.
-    Extrae el token, verifica la firma usando la SECRET_KEY y comprueba
-    el reclamo de expiración.
-
-    Args:
-        credentials (HTTPAuthorizationCredentials): Extraído por FastAPI de las cabeceras.
-
-    Returns:
-        dict: El payload del token decodificado que contiene metadatos del usuario.
-
-    Raises:
-        HTTPException (401): Si el token falta, es inválido o ha expirado.
+    EL CONTROL DE PASAPORTES (get_current_user).
+    -------------------------------------------
+    Esta es la función que se ejecuta cada vez que alguien intenta entrar a un área protegida.
+    
+    ¿Qué hace?
+    1. Mira el token que viene en la cabecera 'Authorization'.
+    2. Usa la SECRET_KEY para descifrarlo.
+    3. Si todo está bien, devuelve la información del usuario (Nombre, Rol).
+    4. Si el token es mentira o ha caducado, lanza un error 401 (No autorizado).
     """
     try:
         # Decodifica y valida el token. PyJWT gestiona la comprobación de 'exp' automáticamente.

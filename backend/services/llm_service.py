@@ -1,23 +1,19 @@
 """
-services/llm_service.py — Orquestación y Abstracción de Modelos de Lenguaje (LLM).
+services/llm_service.py — EL CEREBRO DE LA APLICACIÓN (IA).
+---------------------------------------------------------
+Este módulo es el que permite que Meiga "hable" y "entienda". Es el puente 
+hacia los Modelos de Lenguaje (LLM).
 
-Este módulo implementa el patrón Factory para permitir que MeigaSearch sea 
-independiente del proveedor de IA. Facilita la transición entre modelos locales 
-de bajo consumo y modelos de vanguardia en la nube mediante configuración simple.
+LO MEJOR DE DOS MUNDOS:
+- PRIVACIDAD TOTAL (local): Puedes usar un modelo que corre en tu propio 
+  servidor (SmolLM). Tus datos no salen de tu oficina.
+- POTENCIA MÁXIMA (nube): Puedes conectar con OpenAI, Gemini o Claude para 
+  que Meiga sea extremadamente inteligente.
 
-Capacidades:
-    - Resúmenes Automáticos: Generación de síntesis ejecutivas de documentos.
-    - Chat RAG (Retrieval-Augmented Generation): Respuestas basadas en contexto 
-      con citación de fuentes.
-    - Streaming: Soporte para respuestas fluidas (token a token).
-    - Multi-proveedor: Soporte nativo para OpenAI, Google Gemini, Anthropic 
-      Claude y modelos locales (SmolLM).
-
-Configuración:
-    LLM_PROVIDER=local    ➔ Modelo SmolLM2 (CPU) para privacidad total y coste cero.
-    LLM_PROVIDER=openai   ➔ Potencia de GPT-4o-mini (requiere API Key).
-    LLM_PROVIDER=gemini   ➔ Ventana de contexto amplia con Gemini Flash.
-    LLM_PROVIDER=claude   ➔ Razonamiento superior con Claude Haiku.
+¿POR QUÉ USAMOS UNA FÁBRICA (FACTORY)?
+Porque así el resto de la app no tiene que saber si usas OpenAI o un modelo 
+local. La app solo dice "Dame una respuesta" y este módulo decide quién 
+es el mejor cerebro para el trabajo en ese momento.
 """
 
 import os
@@ -360,11 +356,13 @@ class ClaudeProvider(BaseLLMProvider):
 
 class LLMFactory:
     """
-    Fábrica responsable de la instanciación única (Singleton) de proveedores.
-
-    Esta clase garantiza que el modelo se cargue una sola vez en memoria y 
-    gestiona la lógica de selección basada en variables de entorno o 
-    configuración dinámica.
+    LA FÁBRICA DE CEREBROS (LLMFactory).
+    -----------------------------------
+    Esta clase es como un selector de enchufes. Dependiendo de lo que diga 
+    la configuración (`LLM_PROVIDER`), ella instancia el proveedor correcto.
+    
+    PATRÓN SINGLETON: Solo cargamos el modelo una vez en memoria para 
+    no gastar RAM innecesariamente.
     """
     _instance: BaseLLMProvider | None = None
 

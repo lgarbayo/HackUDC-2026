@@ -1,14 +1,18 @@
 """
-core/config.py — Configuración Centralizada del Proyecto.
+core/config.py — EL CENTRO DE MANDO (Configuración).
+--------------------------------------------------
+Este módulo es el responsable de centralizar todos los "interruptores" y llaves 
+de la aplicación. En lugar de tener valores fijos por todo el código, los 
+definimos aquí una sola vez.
 
-Este módulo gestiona los ajustes de la aplicación usando pydantic-settings,
-permitiendo la carga fluida de la configuración desde variables de entorno
-o un archivo .env. Este patrón es estándar en proyectos OSS ya que
-separa el código de datos sensibles o específicos del entorno.
+¿POR QUÉ USAMOS PYDANTIC-SETTINGS?
+1. SEGURIDAD: Nunca guardamos claves API reales en el código (commit).
+2. FLEXIBILIDAD: Puedes cambiar cómo se comporta la app solo editando el archivo `.env`.
+3. VALIDACIÓN: Si esperas un número y recibes una letra, la app te avisará al arrancar.
 
-Acceso a los ajustes a través de la instancia singleton:
+COMO USARLO EN EL CÓDIGO:
     from core.config import settings
-    print(settings.REDIS_URL)
+    print(settings.LLM_PROVIDER) # Devuelve 'local', 'openai', etc.
 """
 
 from pydantic_settings import BaseSettings
@@ -16,11 +20,11 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     """
-    Ajustes de toda la aplicación y variables de entorno.
+    DEFINICIÓN DE VARIABLES (Design Tokens del Backend).
     
-    Pydantic valida automáticamente los tipos y proporciona valores por defecto.
-    En producción, sobrescriba estos valores configurando las variables de entorno
-    correspondientes (ej., export OPENAI_API_KEY=sk-...).
+    Cada variable aquí definida representa una pieza del rompecabezas.
+    Si una variable no está en el archivo .env, Pydantic usará el valor por defecto 
+    que ves aquí escrito.
     """
 
     # ─── Configuración de Redis ───
@@ -72,13 +76,16 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "/app/uploads"
 
     class Config:
-        """Configuración de Pydantic para la clase Settings."""
-        # Cargar variables desde .env si está presente.
+        """
+        CONFIGURACIÓN DEL MOTOR DE AJUSTES.
+        ----------------------------------
+        Aquí le decimos a Pydantic: "Oye, busca primero en un archivo llamado .env".
+        Esto nos permite tener configuraciones distintas en tu PC, en desarrollo y en producción.
+        """
         env_file = ".env"
         env_file_encoding = "utf-8"
         
-        # Ignorar variables en el entorno que no estén definidas aquí.
-        # Esto evita que la aplicación falle debido a variables de entorno irrelevantes.
+        # Ignorar variables externas que no hayamos definido arriba.
         extra = "ignore"
 
 

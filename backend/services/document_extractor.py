@@ -1,22 +1,18 @@
 """
-services/document_extractor.py — Pipeline de Ingesta y Procesamiento de Documentos.
+services/document_extractor.py — EL REFINADOR DE DATOS (Extracción).
+------------------------------------------------------------------
+Este módulo es como una planta de reciclaje: recibe "basura" (archivos binarios 
+sucios, PDFs con imágenes, Excels desordenados) y los convierte en "oro" 
+(texto limpio y estructurado) que la IA puede leer.
 
-Este módulo es el corazón de la extracción de conocimiento de Meiga. Soporta una 
-amplia variedad de formatos corporativos, transformando archivos binarios en 
-texto limpio y estructurado listo para ser vectorizado.
+¿QUÉ HACE ESTE MÓDULO POR TI?
+1. IDENTIFICA: Sabe si lo que le has dado es una factura, un contrato o un manual.
+2. EXTRAE: Usa herramientas como PyMuPDF o Tesseract (OCR) para "leer" el archivo.
+3. LIMPIA: Quita ruidos como números de página sueltos o espacios extra.
+4. TROCEA (Chunking): Corta el texto en trozos pequeños para que la IA no se atragante.
 
-Capacidades principales:
-    - Extracción Multi-formato: PDF (PyMuPDF + OCR), Office (Word, PPT, Excel), 
-      Imágenes (Tesseract), Datos (JSON, XML, CSV) y Marcado (MD, HTML).
-    - Metadatos Avanzados: Integración con ExifTool para extraer autoría, software 
-      creador y fechas técnicas.
-    - Inteligencia de Categorización: Heurísticas basadas en palabras clave y 
-      nombres de archivo para auto-clasificar documentos.
-    - Limpieza y Fragmentación: Normalización de texto y "Semantic Chunking" 
-      respetando límites de oraciones.
-
-Pipeline de Procesamiento:
-    extract_document_content() ➔ clean_text() ➔ chunk_text() ➔ deduplicate_chunks()
+EL VIAJE DEL DOCUMENTO:
+Archivo -> Extracción -> Limpieza -> Categorización -> Fragmentación (Chunks).
 """
 
 import csv
@@ -164,22 +160,16 @@ def extract_document_content(file_path: str) -> tuple[str, dict]:
 
 def _infer_category(text: str, ext: str, filename: str = "") -> str:
     """
-    Aplica heurísticas lingüísticas para clasificar el documento automáticamente.
-
-    Combina el análisis de palabras clave en el contenido con el análisis del 
-    nombre del archivo. Se asignan pesos mayores (3x) a las coincidencias en el 
-    nombre del archivo, ya que suelen ser más indicativas del propósito del documento.
-
-    Categorías soportadas: RRHH, Finanzas, Legal, Técnico, Comercial, 
-    Sostenibilidad, IT/Soporte y General.
-
-    Args:
-        text (str): El texto extraído (se analizan los primeros 8000 caracteres).
-        ext (str): Extensión del archivo para sesgos de formato.
-        filename (str): Nombre del archivo (sin ruta) para análisis de contexto.
-
-    Returns:
-        str: Nombre de la categoría más probable.
+    EL DETECTIVE DE CATEGORÍAS (_infer_category).
+    --------------------------------------------
+    ¿Cómo sabe la app si un PDF es de "Finanzas" o de "RRHH"?
+    
+    Este detective mira dos cosas:
+    1. EL NOMBRE DEL ARCHIVO: Si se llama "factura_enero", suma muchos puntos a Finanzas.
+    2. EL CONTENIDO: Busca palabras como "nómina", "vacaciones", "IVA", etc.
+    
+    Al final, la categoría con más "puntos" es la ganadora. Si no encuentra nada, 
+    lo marca como "General".
     """
     text_lower = text[:8000].lower()
     filename_lower = filename.lower() if filename else ""
@@ -510,22 +500,17 @@ def clean_text(text: str) -> str:
 
 def chunk_text(text: str, size: int = 1000, overlap: int = 200) -> list[str]:
     """
-    Divide el texto en fragmentos (chunks) manejables para el LLM.
-
-    Implementa una estrategia de "Semantic Chunking" básico:
-        1. Intenta romper por finales de oración (. ! ?) para no cortar 
-           ideas a la mitad.
-        2. Si no es posible, corta en el último espacio disponible.
-        3. Mantiene un solapamiento (overlap) entre fragmentos para preservar 
-           la continuidad del contexto semántico en las búsquedas.
-
-    Args:
-        text (str): Texto limpio y normalizado.
-        size (int): Límite máximo de caracteres por fragmento.
-        overlap (int): Cantidad de caracteres que se repiten en el siguiente fragmento.
-
-    Returns:
-        list[str]: Lista de fragmentos listos para ser vectorizados.
+    EL "CORTADOR DE PIZZA" (chunk_text).
+    -----------------------------------
+    Las IAs modernas tienen un límite de cuánto texto pueden leer a la vez. 
+    Por eso, cortamos los documentos largos en trozos (chunks).
+    
+    ¿POR QUÉ CON SOLAPAMIENTO (OVERLAP)?
+    Imagina que cortas una frase importante por la mitad. El primer trozo pierde 
+    el final y el segundo el principio: ¡nadie entiende nada!
+    
+    SOLUCIÓN: Repetimos un poquito de texto (200 caracteres) al final de cada trozo 
+    para que la IA siempre tenga el contexto completo de lo que venía antes.
     """
     if not text:
         return []

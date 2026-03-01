@@ -1,20 +1,15 @@
 """
-main.py — Punto de entrada de la aplicación FastAPI.
+main.py — EL DIRECTOR DE ORQUESTA (FastAPI).
+--------------------------------------------
+Este es el archivo principal que se ejecuta al arrancar el backend. 
+Imagina que es el pegamento que une la API (las rutas), la Seguridad (Auth), 
+la Inteligencia Artificial (Servicios) y el Frontend (UI).
 
-Este módulo inicializa la aplicación FastAPI, configura los middlewares,
-monta los archivos estáticos para el frontend y gestiona el ciclo de vida
-de la aplicación (eventos de inicio y cierre).
-
-Responsabilidades principales:
-    - Inicialización de la app FastAPI con metadatos.
-    - Configuración de CORS para peticiones entre dominios.
-    - Gestión del ciclo de vida (pre-carga de servicios).
-    - Integración del router de la API.
-    - Servicio de archivos estáticos para la interfaz web.
-
-Uso:
-    Ejecutar el servidor usando uvicorn:
-    $ uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+FLUJO DE ARRANQUE:
+1. Lee la configuración (config.py).
+2. Ejecuta 'lifespan': Carga los modelos de IA "pesados" en memoria.
+3. Abre las puertas (CORS): Permite que el navegador hable con este servidor.
+4. Monta la UI: Sirve los archivos HTML/JS para que veas la web.
 """
 
 import os
@@ -30,16 +25,13 @@ from services.vector_db import VectorDBService
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Gestiona los eventos del ciclo de vida de la aplicación.
+    EL CICLO DE VIDA (Startup & Shutdown).
+    --------------------------------------
+    ¿Por qué existe esto? Porque cargar una IA tarda unos segundos.
+    Si esperamos a que el primer usuario pregunte algo, el sistema parecerá lento.
     
-    Inicio (Startup):
-        - Inicializa el servicio VectorDBService.
-        - Pre-carga el proveedor de embeddings y los modelos locales.
-        - Esto evita que la primera petición API sufra una latencia alta
-          debido a la carga perezosa (lazy loading) de modelos pesados de ML.
-    
-    Cierre (Shutdown):
-        - Espacio para tareas de limpieza (ej. cerrar conexiones a DB).
+    SOLUCIÓN: Usamos el Startup para "pre-calentar" (warm-up) los motores:
+    - Cargamos el VectorDB y los Embeddings ANTES de quedar listos para peticiones.
     """
     # Pre-carga del servicio de Vector DB y el proveedor de embeddings al arrancar.
     # Este es un paso crítico de "pre-calentamiento" para proyectos OSS que usan ML,
@@ -61,15 +53,16 @@ app = FastAPI(
     redoc_url="/redoc",    # Ubicación de ReDoc
 )
 
-# Configuración de CORS (Cross-Origin Resource Sharing).
-# Esencial para permitir que el frontend (potencialmente en otro puerto o dominio)
-# se comunique con esta API de forma segura.
+# MIDDLEWARE DE CORS (Control de Accesos).
+# ----------------------------------------
+# Por seguridad, los navegadores bloquean peticiones que vienen de sitios distintos.
+# Aquí le decimos: "Está bien, confío en mi frontend, déjale hablar conmigo".
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # En producción, especificar dominios exactos por seguridad.
+    allow_origins=["*"],  # En PROD, pon aquí tu dominio real (ej. https://busqueda.miempresa.com)
     allow_credentials=True,
-    allow_methods=["*"],  # Permitir todos los métodos HTTP estándar (GET, POST, etc.).
-    allow_headers=["*"],  # Permitir cabeceras estándar.
+    allow_methods=["*"], 
+    allow_headers=["*"],
 )
 
 # Registro del router principal de la API.

@@ -1375,7 +1375,7 @@
       margin: 0;
     }
 
-    /* ── Document Chat Panel ──────────────────── */
+    /* ── Panel de Chat del Documento ──────────── */
     .dd-chat-toggle {
       display: flex;
       align-items: center;
@@ -1465,7 +1465,7 @@
       cursor: not-allowed;
     }
 
-    /* ── Settings modal ──────────────────────────────────────────── */
+    /* ── Modal de Ajustes ────────────────────────────────────────── */
     dialog.settings-dialog {
       border: none;
       border-radius: 16px;
@@ -1543,7 +1543,7 @@
       cursor: pointer;
     }
 
-    /* ── Summary panel ───────────────────────────────────────────── */
+    /* ── Panel de Resumen ───────────────────────────────────────────── */
     .dd-summary-panel {
       display: none;
       flex-direction: column;
@@ -1568,7 +1568,7 @@
       font-size: .85rem;
     }
 
-    /* ── Global Chat ─────────────────────────────────────────────── */
+    /* ── Chat Global ─────────────────────────────────────────────── */
     .global-chat-btn {
       position: fixed;
       top: 24px;
@@ -2024,7 +2024,7 @@
 
       <!-- Search bar -->
       <div class="search-bar-wrapper w-full">
-        <input id="searchInput" type="text" placeholder="What document or functionality do you need?" autocomplete="off"
+        <input id="searchInput" type="text" placeholder="¿Qué documento o funcionalidad necesitas?" autocomplete="off"
           autocorrect="off" spellcheck="false" aria-label="Search documents" />
         <div class="flex items-center gap-2 pl-2 flex-shrink-0">
           <button id="searchBtn" onclick="onSearchSubmit()"
@@ -2335,13 +2335,13 @@
       async function dbGet(k) { const db = await openDB(); return new Promise((res, rej) => { const r = db.transaction(STORE, 'readonly').objectStore(STORE).get(k); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error) }) }
       async function dbSet(k, v) { const db = await openDB(); return new Promise((res, rej) => { const r = db.transaction(STORE, 'readwrite').objectStore(STORE).put(v, k); r.onsuccess = () => res(); r.onerror = () => rej(r.error) }) }
 
-      /* ── State ─────────────────────────────────────────────── */
+      /* ── Estado Global ─────────────────────────────────────────────── */
       let currentMode = 'direct', activeFilters = [], hasSearched = false, currentQuery = '', rootDirPath = null;
       let searchHistory = JSON.parse(localStorage.getItem('meiga-history') || '[]');
       let fmOpen = false;
       const $ = id => document.getElementById(id);
 
-      /* ── Auth ─────────────────────────────────────────────── */
+      /* ── Autenticación ─────────────────────────────────────────────── */
       const MEIGA_TOKEN_KEY = 'meiga_token', MEIGA_ROLE_KEY = 'meiga_role';
       const MEIGA_LLM_PROVIDER_KEY = 'meiga_llm_provider', MEIGA_LLM_MODEL_KEY = 'meiga_llm_model';
       function getToken() { return localStorage.getItem(MEIGA_TOKEN_KEY); }
@@ -2413,7 +2413,7 @@
       /* ── Medium date ───────────────────────────────────────── */
       function mediumDate(iso) { try { return new Date(iso).toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' }) } catch { return iso || '' } }
 
-      /* ── Layout ────────────────────────────────────────────── */
+      /* ── Interfaz y Diseño ────────────────────────────────────────────── */
       function setHasSearched(v) {
         hasSearched = v;
         $('appTitle').style.display = v ? 'none' : 'flex';
@@ -2433,7 +2433,7 @@
         // Query expansion info se maneja separadamente (solo visible cuando hay expansión)
       }
 
-      /* ── Root directory ────────────────────────────────────── */
+      /* ── Directorio Raíz ────────────────────────────────────── */
       function dirName(path) {
         if (!path) return null;
         if (path === 'local_uploads') return 'Archivos locales';
@@ -2663,7 +2663,7 @@
         updateFilterBadge();
       }
 
-      /* ── History ───────────────────────────────────────────── */
+      /* ── Historial de Búsqueda ───────────────────────────────────────────── */
       function saveHistory() { localStorage.setItem('meiga-history', JSON.stringify(searchHistory)) }
       function addToHistory(q) { searchHistory = [q, ...searchHistory.filter(h => h !== q)].slice(0, 8); saveHistory() }
       function removeFromHistory(q) { searchHistory = searchHistory.filter(h => h !== q); saveHistory(); renderHistory() }
@@ -2678,7 +2678,7 @@
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
       </button>
     </li>`).join('');
-        // Event delegation for clicks
+        // Delegación de eventos para los clics
         list.onclick = function (e) {
           const removeBtn = e.target.closest('[data-remove]');
           if (removeBtn) { e.stopPropagation(); removeFromHistory(removeBtn.dataset.remove); return; }
@@ -2776,7 +2776,7 @@
         renderResultsPage(true);
       }
 
-      /* ── Result card (grouped by document) ─────────────────── */
+      /* ── Tarjeta de Resultado (Agrupado por documento) ─────────────────── */
       let _cardIdCounter = 0;
       function renderCard(r) {
         const doc = r.document;
@@ -3015,7 +3015,7 @@
 
       $('ddChatInput').addEventListener('keydown', e => { if (e.key === 'Enter') sendChatMessage(); });
 
-      /* ── Drag and Drop Upload ──────────────────────────────── */
+      /* ── Subida mediante Arrastrar y Soltar (Drag and Drop) ───────── */
       let dragCounter = 0;
 
       window.addEventListener('dragenter', (e) => {
@@ -3234,10 +3234,10 @@
         $('globalChatSend').disabled = e.target.value.trim().length === 0;
       });
 
-      /* ── Event listeners ───────────────────────────────────── */
+      /* ── Escuchadores de Eventos ───────────────────────────── */
       $('searchInput').addEventListener('keydown', e => { if (e.key === 'Enter') onSearchSubmit() });
 
-      /* ── Boot ──────────────────────────────────────────────── */
+      /* ── Inicialización (Boot) ────────────────────────────── */
       (async () => { renderHistory(); await loadStoredDirectory() })();
     </script>
 </body>

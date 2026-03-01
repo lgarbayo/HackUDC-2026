@@ -1,15 +1,18 @@
 """
-api/routes.py — Enrutamiento y Lógica Principal de la API.
+api/routes.py — EL MAPA DE LA CIUDAD (Rutas de la API).
+------------------------------------------------------
+Aquí definimos todos los "caminos" que el frontend puede tomar. 
+Cada ruta (endpoint) tiene un propósito claro:
 
-Este módulo define todos los endpoints RESTful para la aplicación Meiga,
-organizándolos en grupos lógicos: Autenticación, Ingesta de Documentos,
-Búsqueda y Recuperación, Chat (RAG) y Administración del Sistema.
+1. SEGURIDAD (`/login`): El punto de partida.
+2. FÁBRICA DE DATOS (`/upload`): Donde recibimos los archivos para procesar.
+3. EL BUSCADOR (`/search`): Donde ocurre la magia de encontrar información.
+4. EL CONSEJERO IA (`/global-chat`): Donde la IA lee los documentos por ti.
 
-Características clave:
-    - Endpoints protegidos por JWT con RBAC (Control de Acceso Basado en Roles).
-    - Procesamiento asíncrono de documentos mediante Celery.
-    - Búsqueda híbrida (Semántica + Palabras clave) con Qdrant.
-    - Chat RAG global con soporte para citaciones.
+CONEXIÓN CON CELERY:
+Importante: La subida de archivos NO ocurre aquí dentro. Esta ruta solo recibe 
+el archivo y le pasa la pelota a un "Worker" (en `tasks.py`) para que haga el 
+trabajo pesado sin hacer esperar al usuario.
 """
 
 import os
@@ -194,21 +197,16 @@ async def search_documents(
     current_user: dict = Depends(get_current_user),
 ):
     """
-    Endpoint principal de búsqueda sobre los documentos indexados.
-
-    Soporta múltiples modos de operación:
-        1. semantic (por defecto): Búsqueda híbrida (vectorial + filtros de metadatos).
-        2. text: Búsqueda textual exacta (estilo búsqueda en documento local).
-        3. descriptive (expand=true): Utiliza un LLM para expandir la consulta.
-
-    Flujo de ejecución:
-        1. Normaliza la consulta y valida los parámetros.
-        2. Construye filtros complejos de Qdrant basados en metadatos (ExifTool, tipos, fechas).
-        3. Aplica restricciones de seguridad RBAC.
-        4. Realiza la búsqueda en el motor vectorial y retorna resultados paginados.
-
-    Returns:
-        SearchResponse: Objeto con resultados, total, página y duración del proceso.
+    ¿CÓMO BUSCAMOS LA INFORMACIÓN? (El Motor de Búsqueda).
+    ----------------------------------------------------
+    Este endpoint es el más complejo porque hace tres cosas a la vez:
+    
+    1. FILTROS RÍGIDOS: Si el usuario pide solo "PDFs de 2023", descartamos el resto.
+    2. BÚSQUEDA SEMÁNTICA: Entendemos el significado (ej: "problemas de red" encuentra "fallo en el router").
+    3. BÚSQUEDA TEXTUAL (Mode: text): Como un 'Busca y reemplaza' clásico para encontrar palabras exactas.
+    
+    EL FLUJO:
+    Normalizar query -> Aplicar Filtros -> Preguntar a Qdrant -> Agrupar por documento -> Responder.
     """
     try:
         start_time = time.time()
