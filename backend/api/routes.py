@@ -358,27 +358,15 @@ async def search_documents(
 
         duration_ms = int((time.time() - start_time) * 1000)
 
-        response = {
+        return {
             "results": results,
             "total": len(results),
             "page": 1,
             "pageSize": top_k,
             "durationMs": duration_ms,
-            "queryEchoed": q,
-        }
-        
-        # ── Respuesta final ──
-        return {
-            "results": list(grouped.values()),
-            "total": sum(len(d["fragments"]) for d in grouped.values()),
-            "page": 1,
-            "pageSize": top_k,
-            "durationMs": int((time.time() - start_time) * 1000),
             "searchMode": mode,
             "queryEchoed": q,
         }
-
-        return response
 
     except Exception as e:
         logger.error(f"❌ Error en búsqueda: {e}")
