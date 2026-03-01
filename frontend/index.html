@@ -1907,8 +1907,8 @@
         const errEl = $('pathInputError');
         if (!path) {
           if (errEl) { errEl.textContent = 'Introduce una ruta válida.'; errEl.style.display = 'block'; }
-            return;
-          }
+          return;
+        }
         $('pathInputModal').style.display = 'none';
         await indexDirectory(path);
       }
