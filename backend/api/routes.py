@@ -15,27 +15,25 @@ el archivo y le pasa la pelota a un "Worker" (en `tasks.py`) para que haga el
 trabajo pesado sin hacer esperar al usuario.
 """
 
-import os
 import asyncio
 import logging
+import os
 import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, Query, Request, Depends
+from api.auth import (USERS, create_token, get_current_user, pwd_context,
+                      require_admin, require_admin_or_editor)
+from celery.result import AsyncResult
+from core.config import settings
+from fastapi import (APIRouter, Depends, File, HTTPException, Query, Request,
+                     UploadFile)
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
-
-from api.auth import (
-    get_current_user, require_admin, require_admin_or_editor, 
-    USERS, create_token, pwd_context
-)
-from workers.tasks import process_document
-from services.vector_db import VectorDBService
 from services.document_extractor import SUPPORTED_EXTENSIONS, normalize_query
-from core.config import settings
-from celery.result import AsyncResult
+from services.vector_db import VectorDBService
+from workers.tasks import process_document
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +100,7 @@ async def upload_document(
     upload_dir.mkdir(parents=True, exist_ok=True)
 
     file_path = upload_dir / file.filename
+    file_path.parent.mkdir(parents=True, exist_ok=True)  # crea subdirectorios si la ruta es relativa (ej. carpeta/subcarpeta/file.pdf)
     try:
         content = await file.read()
         with open(file_path, "wb") as f:
@@ -411,6 +410,7 @@ async def search_documents(
 
 from fastapi.responses import FileResponse
 
+
 def _find_file_on_disk(source: str) -> Path | None:
     """Intenta encontrar el archivo físico, ya sea absoluto, relativo o solo por nombre."""
     file_path = Path(source)
@@ -426,7 +426,7 @@ def _find_file_on_disk(source: str) -> Path | None:
             
     # Fallback 2: Es solo un nombre de archivo (o no se encontró la ruta absoluta).
     # Buscamos en las carpetas de datos conocidas.
-    search_dirs = ["/app/datasets", "/app/uploads", "../datasets", "../uploads"]
+    search_dirs = ["/app/datasets", "/app/uploads", "./sharepoint_data", "/app/sharepoint_data", "../datasets", "../uploads"]
     filename_to_find = file_path.name
     
     for d in search_dirs:
@@ -542,8 +542,9 @@ async def global_rag_chat(
         StreamingResponse: Flujo de eventos (SSE) con los tokens generados y el mapa de fuentes.
     """
     try:
-        from services.llm_service import get_llm_service
         import json
+
+        from services.llm_service import get_llm_service
 
         role = current_user.get("role", "normal")
         vdb = VectorDBService()
@@ -1001,7 +1002,7 @@ async def get_filter_metadata(current_user: dict = Depends(get_current_user)):
         vdb = VectorDBService()
         role = current_user.get("role", "normal")
 
-        from qdrant_client.models import Filter, FieldCondition, MatchValue
+        from qdrant_client.models import FieldCondition, Filter, MatchValue
 
         # Construir filtro RBAC básico si no es admin
         query_filter = None
