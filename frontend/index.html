@@ -1443,7 +1443,7 @@
       <!-- Inputs nativos del navegador (invisible, se disparan por los botones) -->
       <input type="file" id="pickerFolderInput" webkitdirectory multiple style="display:none"
         onchange="handlePickedFiles(this.files)">
-      <input type="file" id="pickerFileInput" multiple accept=".pdf,.txt,.csv,.xlsx" style="display:none"
+      <input type="file" id="pickerFileInput" multiple accept=".pdf,.txt,.csv,.xlsx,.png,.jpg,.jpeg" style="display:none"
         onchange="handlePickedFiles(this.files)">
 
       <!-- Primario: seleccionar carpeta entera -->
@@ -1474,80 +1474,81 @@
   </div>
 
   <!-- FILE MANAGER — fixed top-right (hidden until authenticated) -->
-  <div id="topBar" style="position:fixed;top:16px;right:20px;z-index:300;display:none;gap:8px;align-items:center;">
-    <!-- Subir archivo: visible para admin y editor, oculto para lector -->
-    <button id="uploadBtn" class="fm-trigger" style="display:none;"
-      onclick="document.getElementById('uploadInput').click()">
-      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="currentColor" viewBox="0 0 16 16">
-        <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
-        <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/>
-      </svg>
-      <span>Subir archivo</span>
-    </button>
-    <input id="uploadInput" type="file" style="display:none" accept=".pdf,.txt,.csv,.xlsx"
-      onchange="if(this.files[0]) uploadDocument(this.files[0])" />
-    <button id="settingsBtn" class="fm-trigger" style="display:none;" onclick="openSettingsModal()">
-      &#9881;&#65039; <span>Ajustes LLM</span>
-    </button>
-    <div style="position:relative;" id="fmContainer">
-      <button class="fm-trigger" id="fmTriggerBtn" onclick="toggleFmMenu()" aria-label="Gestionar archivos">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-          <path
-            d="M1 3.5A1.5 1.5 0 0 1 2.5 2h2.764c.958 0 1.76.56 2.12 1.349l.459 1.025H13.5A1.5 1.5 0 0 1 15 5.914V12.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 12.5v-9zm8.485 0H2.5a.5.5 0 0 0-.5.5V12.5a.5.5 0 0 0 .5.5h11a.5.5 0 0 0 .5-.5V5.914a.5.5 0 0 0-.5-.5H7.264a.5.5 0 0 1-.447-.276L6.353 3.5H2.5z" />
-        </svg>
-        <span>Gestionar archivos</span>
-        <svg id="fmChevron" class="fm-chevron" xmlns="http://www.w3.org/2000/svg" width="12" height="12"
-          fill="currentColor" viewBox="0 0 16 16">
-          <path fill-rule="evenodd"
-            d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z" />
-        </svg>
+  <div id="topBar" style="position:fixed;top:16px;right:20px;z-index:300;display:none;flex-direction:column;align-items:flex-end;gap:8px;">
+    <!-- Fila 1: Ajustes, Gestionar archivos, Cerrar sesión -->
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button id="settingsBtn" class="fm-trigger" style="display:none;" onclick="openSettingsModal()">
+        &#9881;&#65039; <span>Ajustes LLM</span>
       </button>
-
-      <div class="fm-popover popover-base" id="fmPopover" style="display:none">
-        <span class="fm-section-label">Directorio raíz</span>
-        <div class="fm-dir-row">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="#fca311" class="fm-dir-icon"
-            viewBox="0 0 16 16">
-            <path
-              d="M.5 3.5A1.5 1.5 0 0 1 2.5 2h2.764c.958 0 1.76.56 2.12 1.349l.459 1.025H13.5A1.5 1.5 0 0 1 15 5.914V12.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 12.5v-9zM2 3a.5.5 0 0 0-.5.5v10a.5.5 0 0 0 .5.5h12a.5.5 0 0 0 .5-.5V5a.5.5 0 0 0-.5-.5H7.586L5.586 3H2z" />
-          </svg>
-          <span class="fm-dir-name fm-dir-name--unset" id="fmDirName">Sin configurar</span>
-        </div>
-        <div class="fm-divider"></div>
-
-        <button class="fm-action-btn" onclick="doPickDirectory()">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-            <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
-            <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/>
-          </svg>
-          <span>Subir más archivos</span>
-        </button>
-
-        <button class="fm-action-btn danger" onclick="clearDatabase()">
+      <div style="position:relative;" id="fmContainer">
+        <button class="fm-trigger" id="fmTriggerBtn" onclick="toggleFmMenu()" aria-label="Gestionar archivos">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
             <path
-              d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z" />
+              d="M1 3.5A1.5 1.5 0 0 1 2.5 2h2.764c.958 0 1.76.56 2.12 1.349l.459 1.025H13.5A1.5 1.5 0 0 1 15 5.914V12.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 12.5v-9zm8.485 0H2.5a.5.5 0 0 0-.5.5V12.5a.5.5 0 0 0 .5.5h11a.5.5 0 0 0 .5-.5V5.914a.5.5 0 0 0-.5-.5H7.264a.5.5 0 0 1-.447-.276L6.353 3.5H2.5z" />
+          </svg>
+          <span>Gestionar archivos</span>
+          <svg id="fmChevron" class="fm-chevron" xmlns="http://www.w3.org/2000/svg" width="12" height="12"
+            fill="currentColor" viewBox="0 0 16 16">
             <path fill-rule="evenodd"
-              d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z" />
+              d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z" />
           </svg>
-          <span>Limpiar base de datos</span>
         </button>
-      </div>
-    </div> <!-- Closes fmContainer -->
 
-    <!-- CERRAR SESIÓN -->
-    <button id="logoutBtn" class="fm-trigger" onclick="logoutUser()">
-      <span>Cerrar sesión</span>
-    </button>
+        <div class="fm-popover popover-base" id="fmPopover" style="display:none">
+          <span class="fm-section-label">Directorio raíz</span>
+          <div class="fm-dir-row">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="#fca311" class="fm-dir-icon"
+              viewBox="0 0 16 16">
+              <path
+                d="M.5 3.5A1.5 1.5 0 0 1 2.5 2h2.764c.958 0 1.76.56 2.12 1.349l.459 1.025H13.5A1.5 1.5 0 0 1 15 5.914V12.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 12.5v-9zM2 3a.5.5 0 0 0-.5.5v10a.5.5 0 0 0 .5.5h12a.5.5 0 0 0 .5-.5V5a.5.5 0 0 0-.5-.5H7.586L5.586 3H2z" />
+            </svg>
+            <span class="fm-dir-name fm-dir-name--unset" id="fmDirName">Sin configurar</span>
+          </div>
+          <div class="fm-divider"></div>
+
+          <button class="fm-action-btn" onclick="doPickDirectory()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+              <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/>
+            </svg>
+            <span>Subir más archivos</span>
+          </button>
+
+          <button class="fm-action-btn danger" onclick="clearDatabase()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+              <path
+                d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z" />
+              <path fill-rule="evenodd"
+                d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z" />
+            </svg>
+            <span>Limpiar base de datos</span>
+          </button>
+        </div>
+      </div> <!-- Closes fmContainer -->
+
+      <!-- CERRAR SESIÓN -->
+      <button id="logoutBtn" class="fm-trigger" onclick="logoutUser()">
+        <span>Cerrar sesión</span>
+      </button>
+    </div>
+
+    <!-- Fila 2: Subir archivo + Home -->
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button id="uploadBtn" class="fm-trigger" style="display:none;"
+        onclick="document.getElementById('uploadInput').click()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="currentColor" viewBox="0 0 16 16">
+          <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+          <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/>
+        </svg>
+        <span>Subir archivo</span>
+      </button>
+      <input id="uploadInput" type="file" style="display:none" accept=".pdf,.txt,.csv,.xlsx,.png,.jpg,.jpeg"
+        onchange="if(this.files[0]) uploadDocument(this.files[0])" />
+      <button id="homeBtn" onclick="resetSearchState()" style="display:none; background:rgba(255,255,255,0.85); backdrop-filter:blur(8px); border:1px solid rgba(20,33,61,0.1); border-radius:12px; padding:8px 14px; cursor:pointer; align-items:center; gap:8px; transition:all .2s ease; box-shadow:0 2px 8px rgba(20,33,61,0.08);" onmouseover="this.style.background='rgba(20,33,61,0.06)';this.style.transform='translateY(-1px)';this.style.boxShadow='0 4px 12px rgba(20,33,61,0.12)'" onmouseout="this.style.background='rgba(255,255,255,0.85)';this.style.transform='none';this.style.boxShadow='0 2px 8px rgba(20,33,61,0.08)'">
+        <img src="assets/home-1-svgrepo-com.svg" alt="Home" style="width:24px;height:24px;" />
+      </button>
+    </div>
   </div>
-  <div class="fm-backdrop" id="fmBackdrop" style="display:none" onclick="closeFmMenu()"></div>
-  <div class="fm-backdrop" id="filterBackdrop" style="display:none; z-index:190;"
-    onclick="toggleFilterMenu(null, true)"></div>
-
-  <!-- HOME BUTTON (visible only after searching) -->
-  <button id="homeBtn" onclick="resetSearchState()" style="display:none; position:fixed; top:16px; left:16px; z-index:100; background:rgba(255,255,255,0.85); backdrop-filter:blur(8px); border:1px solid rgba(20,33,61,0.1); border-radius:12px; padding:8px 14px; cursor:pointer; align-items:center; gap:8px; transition:all .2s ease; box-shadow:0 2px 8px rgba(20,33,61,0.08);" onmouseover="this.style.background='rgba(20,33,61,0.06)';this.style.transform='translateY(-1px)';this.style.boxShadow='0 4px 12px rgba(20,33,61,0.12)'" onmouseout="this.style.background='rgba(255,255,255,0.85)';this.style.transform='none';this.style.boxShadow='0 2px 8px rgba(20,33,61,0.08)'">
-    <img src="assets/home-1-svgrepo-com.svg" alt="Home" style="width:24px;height:24px;" />
-  </button>
 
   <!-- MAIN CONTENT — hidden until authenticated -->
   <div id="shellLayout" class="min-h-screen flex flex-col items-center justify-center px-4 pb-12"
@@ -1958,7 +1959,7 @@
         $('pickerOverlay').style.display = 'flex';
       }
 
-      const _SUPPORTED_EXTS = new Set(['.pdf', '.txt', '.csv', '.xlsx']);
+      const _SUPPORTED_EXTS = new Set(['.pdf', '.txt', '.csv', '.xlsx', '.png', '.jpg', '.jpeg']);
 
       async function handlePickedFiles(fileList) {
         if (!fileList || fileList.length === 0) {
