@@ -76,55 +76,71 @@ Proveedores soportados: `local`, `openai`, `gemini`, `claude`.
 **Endpoint:** `GET /api/search`
 
 **Parámetros:**
-- `q`: Consulta de búsqueda (ej. "factura de electricidad")
-- `mode`: `semantic` (default) o `text` (exacto)
-- `month` / `year`: Filtrado cronológico
-- `type`: `pdf`, `txt`, `csv`, `xlsx`, `image`
-- `author`: Filtrar por autor extraído de metadatos
+-   `q`: Consulta de búsqueda (ej. "factura de electricidad")
+-   `mode`: `semantic` (default) o `text` (exacto)
+-   `month` / `year`: Filtrado cronológico
+-   `type`: `pdf`, `txt`, `csv`, `xlsx`, `image`
+-   `author`: Filtrar por autor extraído de metadatos
 
 ## 🏗️ Arquitectura
 
 ```mermaid
 graph TD
-    subgraph "Frontend (Interfaz Premium)"
-        UI["HTML5 / JS Vanilla"]
-        CSS["Glassmorphism CSS"]
-        MD["Marked.js (Markdown)"]
+    classDef frontend fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
+    classDef backend fill:#fff3e0,stroke:#e65100,stroke-width:2px;
+    classDef workers fill:#f3e5f5,stroke:#4a148c,stroke-width:2px;
+    classDef database fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px;
+    classDef extractor fill:#fce4ec,stroke:#880e4f,stroke-width:2px;
+
+    subgraph "Frontend (Interfaz de Usuario)"
+        UI["HTML5 / JS Vanilla"]:::frontend
+        CSS["Glassmorphism CSS"]:::frontend
+        MD["Marked.js (Markdown)"]:::frontend
     end
 
     subgraph "Backend (Cerebro API)"
-        FAST["FastAPI (Python 3.11+)"]
-        PYD["Pydantic v2 (Validación)"]
-        JWT["JWT + Bcrypt (Seguridad)"]
+        FAST["FastAPI (Python 3.11+)"]:::backend
+        PYD["Pydantic v2 (Validación)"]:::backend
+        JWT["JWT + Bcrypt (Seguridad)"]:::backend
     end
 
     subgraph "Procesamiento Asíncrono"
-        CEL["Celery (Workers)"]
-        RED["Redis (Broker/Cache)"]
+        RED["Redis (Queue/Broker)"]:::workers
+        CEL["Celery (Workers)"]:::workers
     end
 
     subgraph "Inteligencia & Búsqueda"
-        QDR[("Qdrant (Base de Datos Vectorial)")]
-        SENT["Sentence-Transformers (Embeddings)"]
-        LLM["LLMs: OpenAI / Gemini / Claude / SmolLM"]
+        QDR[("Qdrant (Vector DB)")]:::database
+        SENT["Sentence-Transformers (Embeddings)"]:::database
+        LLM["LLMs (OpenAI, Gemini, Claude, local)"]:::database
     end
 
-    subgraph "Extracción de Datos"
-        EXIF["ExifTool (Metadatos)"]
-        OCR["Tesseract (OCR)"]
-        PDF["PyMuPDF (Extractores)"]
+    subgraph "Extracción & OCR"
+        EXIF["ExifTool (Metadatos)"]:::extractor
+        TESS["Tesseract (OCR)"]:::extractor
+        PDF["PyMuPDF (Docs)"]:::extractor
     end
 
+    %% Conexiones
+    UI -- "REST API (JSON)" --> FAST
     UI --- CSS
-    UI --> FAST
-    FAST --> CEL
-    CEL <--> RED
-    CEL --> EXIF & OCR & PDF
-    EXIF & OCR & PDF --> SENT
-    SENT --> QDR
-    FAST --> QDR
-    FAST --> LLM
+    UI --- MD
+
+    FAST -- "Encola tareas" --> RED
+    RED <--> CEL
+    
+    CEL -- "Usa extractores" --> PDF & EXIF & TESS
+    PDF & EXIF & TESS -- "Genera texto" --> SENT
+    SENT -- "Vectores" --> QDR
+    
+    FAST -- "Búsqueda Híbrida" --> QDR
+    FAST -- "Chat RAG" --> LLM
+    LLM -- "Respuesta Markdown" --> MD
 ```
+
+> [!NOTE]
+> **¿Qué es Marked.js?**
+> [Marked.js](https://marked.js.org/) es un compilador de Markdown de alto rendimiento. En MeigaSearch, lo utilizamos en el frontend para transformar las respuestas de la IA (que vienen en formato Markdown) en HTML limpio y formateado (negritas, listas, bloques de código), garantizando una experiencia de lectura premium en el chat.
 
 ## 🧪 Testing
 
