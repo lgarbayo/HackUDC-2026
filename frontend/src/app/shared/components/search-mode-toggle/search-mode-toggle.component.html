@@ -1,0 +1,23 @@
+<div class="mode-toggle" role="group" aria-label="Search mode">
+  <button
+    class="mode-btn"
+    [class.active]="activeMode === 'direct'"
+    (click)="setMode('direct')"
+    title="Direct keyword search"
+    type="button"
+    aria-label="Direct search"
+  >
+    <ion-icon name="search-outline"></ion-icon>
+  </button>
+
+  <button
+    class="mode-btn"
+    [class.active]="activeMode === 'descriptive'"
+    (click)="setMode('descriptive')"
+    title="Descriptive / semantic search"
+    type="button"
+    aria-label="Descriptive semantic search"
+  >
+    <ion-icon name="sparkles-outline"></ion-icon>
+  </button>
+</div>
