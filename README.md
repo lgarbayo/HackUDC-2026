@@ -20,7 +20,7 @@ MeigaSearch resuelve el problema de búsqueda a través de documentos corporativ
 - **Autenticación JWT**: Control de acceso por roles (admin, editor, normal) con cifrado `bcrypt`.
 - **Arquitectura Robusta**: Qdrant como base de datos vectorial y Celery + Redis para procesamiento asíncrono.
 
-## � Formatos Soportados
+## 📃 Formatos Soportados
 
 | Tipo | Extensiones |
 | :--- | :--- |
